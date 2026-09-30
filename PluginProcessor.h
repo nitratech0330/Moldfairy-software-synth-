@@ -193,27 +193,24 @@ public:
     juce::Synthesiser Synth;
     static inline const int ReverbLFO[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, -1, -2, -3, -4, -5, -6, -7, -8, -8, -7, -6, -5, -4, -3, -2, -1, 0};
     
-    static inline const float Ssawisonoroff[]{
-        0.0f,
-        0.0f,
-        0.0f,
-        0.0f,
+    static inline const int oscindex[]{
+    1,1,0,0,0,0,0,0,
+    0,0,1,1,0,0,0,0,
+    1,1,1,1,0,0,0,0,
+    0,0,1,1,1,1,0,0,
+    1,1,1,1,1,1,0,0,
+    0,0,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1
+    };
+
+    static inline const float gainfix[]{
         1.0f,
-        0.0f,
-        0.0f,
-        0.0f,
-        1.0f,
-        1.0f,
-        0.0f,
-        0.0f,
-        1.0f,
-        1.0f,
-        1.0f,
-        0.0f,
-        1.0f,
-        1.0f,
-        1.0f,
-        1.0f
+        0.9f,
+        0.75f,
+        0.7f,
+        0.65f,
+        0.6f,
+        0.6f
     };
 
 static inline const float WaveTable[]{

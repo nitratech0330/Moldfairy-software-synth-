@@ -204,10 +204,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::p
 
     juce::StringArray numv;
     numv.add ("single");
+    numv.add ("2");
     numv.add ("3");
+    numv.add ("4");
     numv.add ("5");
+    numv.add ("6");
     numv.add ("7");
-    numv.add ("9");
 
     juce::StringArray Waveforms;
     Waveforms.add ("SAW");
@@ -578,14 +580,10 @@ void startNote (int Notenum, float Velocity, juce::SynthesiserSound*, int) overr
     Moldfairy2.Modenvshap = (int)24 * (static_cast<int>(Moldfairy2.Mshapetable->load()));
     
 
-    int numV = static_cast<int>(Moldfairy2.numV->load());
-    int numV2 = static_cast<int>(Moldfairy2.numV2->load());
-    int numV3 = static_cast<int>(Moldfairy2.numV3->load());
-    int numV4 = static_cast<int>(Moldfairy2.numV4->load());
-    numvoice = (int)(4 * numV);
-    numvoice2 = (int)(4 * numV2);
-    numvoice3 = (int)(4 * numV3);
-    numvoice4 = (int)(4 * numV4);
+    numV = static_cast<int>(Moldfairy2.numV->load());
+    numV2 = static_cast<int>(Moldfairy2.numV2->load());
+    numV3 = static_cast<int>(Moldfairy2.numV3->load());
+    numV4 = static_cast<int>(Moldfairy2.numV4->load());
     SuperSaw = (numV > 0.5f);
     SuperSaw2 = (numV2 > 0.5f);
     SuperSaw3 = (numV3 > 0.5f);
@@ -596,52 +594,37 @@ void startNote (int Notenum, float Velocity, juce::SynthesiserSound*, int) overr
     int Dtune3 = static_cast<int>(Moldfairy2.dtun3->load());
     int Dtune4 = static_cast<int>(Moldfairy2.dtun4->load());
 
+    osc1ph[0]=PH1; osc1ph[1]=PH1;
+    osc2ph[0]=PH2; osc2ph[1]=PH2;
+    osc3ph[0]=PH3; osc3ph[1]=PH3;
+    osc4ph[0]=PH4; osc4ph[1]=PH4;
+
     if (SuperSaw){
         Damo = Moldfairy2.DetunAmo[Dtune];
-        SS1 = PH1 * Damo;
-        SS2 = SS1 * Damo;
-        SS3 = SS2 * Damo;
-        SS4 = SS3 * Damo;
-        SS5 = SS4 * Damo;
-        SS6 = SS5 * Damo;
-        SS7 = PH1 * (1 + (1 - Damo));
-        SS8 = SS7 * (1 + (1 - Damo));
+        for (int i=0; i<6; ++i){
+        osc1ph[i+2]=osc1ph[i+1]*Damo;
+        }
     }
 
     if (SuperSaw2){
         Damo2 = Moldfairy2.DetunAmo[Dtune2];
-        aSS1 = PH2 * Damo2;
-        aSS2 = aSS1 * Damo2;
-        aSS3 = aSS2 * Damo2;
-        aSS4 = aSS3 * Damo2;
-        aSS5 = aSS4 * Damo2;
-        aSS6 = aSS5 * Damo2;
-        aSS7 = PH2 * (1 + (1 - Damo2));
-        aSS8 = aSS7 * (1 + (1 - Damo2));
+        for (int i=0; i<6; ++i){
+        osc2ph[i+2]=osc2ph[i+1]*Damo2;
+        }
     }
 
     if (SuperSaw3){
         Damo3 = Moldfairy2.DetunAmo[Dtune3];
-        bSS1 = PH3 * Damo3;
-        bSS2 = bSS1 * Damo3;
-        bSS3 = bSS2 * Damo3;
-        bSS4 = bSS3 * Damo3;
-        bSS5 = bSS4 * Damo3;
-        bSS6 = bSS5 * Damo3;
-        bSS7 = PH3 * (1 + (1 - Damo3));
-        bSS8 = bSS7 * (1 + (1 - Damo3));
+        for (int i=0; i<6; ++i){
+        osc3ph[i+2]=osc3ph[i+1]*Damo3;
+        }
     }
 
     if (SuperSaw4){
         Damo4 = Moldfairy2.DetunAmo[Dtune4];
-        cSS1 = PH4 * Damo4;
-        cSS2 = cSS1 * Damo4;
-        cSS3 = cSS2 * Damo4;
-        cSS4 = cSS3 * Damo4;
-        cSS5 = cSS4 * Damo4;
-        cSS6 = cSS5 * Damo4;
-        cSS7 = PH4 * (1 + (1 - Damo4));
-        cSS8 = cSS7 * (1 + (1 - Damo4));
+        for (int i=0; i<6; ++i){
+        osc4ph[i+2]=osc4ph[i+1]*Damo4;
+        }
     }
    
     ENV.noteOn();
@@ -701,169 +684,63 @@ void renderNextBlock (AudioBuffer<float> &output, int startSample, int numSample
         float viv = Moldfairy2.WaveTable[((int)(vivData*31))+32];
 
         float viv4amo = 1 - (viv*vivamo4);
-        float fm4amo = 1 - (Data1*FMamo4);
+        float fm4amo = 1 - (osc1dt[0]*FMamo4);
 
-        Data4 += (PH4 * viv4amo) * fm4amo;
-        if (Data4 >= 1.0f)Data4 -= 1.0f;
-        float osc4 = Moldfairy2.WaveTable[((int)(Data4*31))+osc4wave];
+        float osc4[8];
+        for (int i=0; i<8; ++i){
+            osc4dt[i]+=(osc4ph[i]*viv4amo) * fm4amo;
+            if (osc4dt[i]>=1.0f)osc4dt[i]=0;
+            osc4[i] = Moldfairy2.WaveTable[((int)(osc4dt[i]*31))+osc4wave]*Moldfairy2.oscindex[i+(numV4*8)];
+        }
 
         float viv3amo = 1 - (viv*vivamo3);
-        float fm3amo = 1 - (Data4*FMamo3);
-        
-        Data3 += (PH3 * viv3amo) * fm3amo;
-        if (Data3 >= 1.0f)Data3 -= 1.0f;
-        float osc3 = Moldfairy2.WaveTable[((int)(Data3*31))+osc3wave];
+        float fm3amo = 1 - (osc4dt[0]*FMamo3);
+
+        float osc3[8];
+        for (int i=0; i<8; ++i){
+            osc3dt[i]+=(osc3ph[i]*viv3amo) * fm3amo;
+            if (osc3dt[i]>=1.0f)osc3dt[i]=0;
+            osc3[i] = Moldfairy2.WaveTable[((int)(osc3dt[i]*31))+osc3wave]*Moldfairy2.oscindex[i+(numV3*8)];
+        }
 
         float viv2amo = 1 - (viv*vivamo2);
-        float fm2amo = 1 - (Data3*FMamo2);
+        float fm2amo = 1 - (osc3dt[0]*FMamo2);
 
-        Data2 += (PH2 * viv2amo) * fm2amo;
-        if (Data2 >= 1.0f)Data2 -= 1.0f;
-        float osc2 = Moldfairy2.WaveTable[((int)(Data2*31))+osc2wave];
+        float osc2[8];
+        for (int i=0; i<8; ++i){
+            osc2dt[i]+=(osc2ph[i]*viv2amo) * fm2amo;
+            if (osc2dt[i]>=1.0f)osc2dt[i]=0;
+            osc2[i] = Moldfairy2.WaveTable[((int)(osc2dt[i]*31))+osc2wave]*Moldfairy2.oscindex[i+(numV2*8)];
+        }
 
         float viv1amo = 1 - (viv*vivamo1);
-        float fm1amo = 1 - (Data2*FMamo1);
+        float fm1amo = 1 - (osc2dt[0]*FMamo1);
 
-        Data1 += (PH1 * viv1amo) * fm1amo;
-        if (Data1 >= 1.0f)Data1 = 0;
-        float osc1 = Moldfairy2.WaveTable[((int)(Data1*31))+osc1wave];
+        float osc1[8];
+        for (int i=0; i<8; ++i){
+            osc1dt[i]+=(osc1ph[i]*viv1amo) * fm1amo;
+            if (osc1dt[i]>=1.0f)osc1dt[i]=0;
+            osc1[i] = Moldfairy2.WaveTable[((int)(osc1dt[i]*31))+osc1wave]*Moldfairy2.oscindex[i+(numV*8)];
+        }
 
+        float out1[2];
+        float out2[2];
+        float out3[2];
+        float out4[2];
+        out1[0]=0.0f;out1[1]=0.0f;
+        out2[0]=0.0f;out2[1]=0.0f;
+        out3[0]=0.0f;out3[1]=0.0f;
+        out4[0]=0.0f;out4[1]=0.0f;
 
-        aDataS1 += aSS1 * viv2amo * fm2amo;
-        if (aDataS1 >= 1.0f)aDataS1 -= 1.0f;
-        float aSV1 = Moldfairy2.WaveTable[((int)(aDataS1*31))+osc2wave];
-        aDataS2 += aSS2 * viv2amo * fm2amo;
-        if (aDataS2 >= 1.0f)aDataS2 -= 1.0f;
-        float aSV2 = Moldfairy2.WaveTable[((int)(aDataS2*31))+osc2wave];
-        aDataS3 += aSS3 * viv2amo * fm2amo;
-        if (aDataS3 >= 1.0f)aDataS3 -= 1.0f;
-        float aSV3 = Moldfairy2.WaveTable[((int)(aDataS3*31))+osc2wave];
-        aDataS4 += aSS4 * viv2amo * fm2amo;
-        if (aDataS4 >= 1.0f)aDataS4 -= 1.0f;
-        float aSV4 = Moldfairy2.WaveTable[((int)(aDataS4*31))+osc2wave];
-        aDataS5 += aSS5 * viv2amo * fm2amo;
-        if (aDataS5 >= 1.0f)aDataS5 -= 1.0f;
-        float aSV5 = Moldfairy2.WaveTable[((int)(aDataS5*31))+osc2wave];
-        aDataS6 += aSS6 * viv2amo * fm2amo;
-        if (aDataS6 >= 1.0f)aDataS6 -= 1.0f;
-        float aSV6 = Moldfairy2.WaveTable[((int)(aDataS6*31))+osc2wave];
-        aDataS7 += aSS7 * viv2amo * fm2amo;
-        if (aDataS7 >= 1.0f)aDataS7 -= 1.0f;
-        float aSV7 = Moldfairy2.WaveTable[((int)(aDataS7*31))+osc2wave];
-        aDataS8 += aSS8 * viv2amo * fm2amo;
-        if (aDataS8 >= 1.0f)aDataS8 -= 1.0f;
-        float aSV8 = Moldfairy2.WaveTable[((int)(aDataS8*31))+osc2wave];
+        for (int i=0; i<8; ++i){
+            out1[(i+2)%2] += osc1[i];
+            out2[(i+2)%2] += osc2[i];
+            out3[(i+2)%2] += osc3[i];
+            out4[(i+2)%2] += osc4[i];
+        }
 
-        float onoroff2a = Moldfairy2.Ssawisonoroff[0+numvoice2];
-        float onoroff4a = Moldfairy2.Ssawisonoroff[1+numvoice2];
-        float onoroff6a = Moldfairy2.Ssawisonoroff[2+numvoice2];
-        float onoroff8a = Moldfairy2.Ssawisonoroff[3+numvoice2];
-
-        DataS1 += SS1 * viv1amo * fm1amo;
-        if (DataS1 >= 1.0f)DataS1 -= 1.0f;
-        float SV1 = Moldfairy2.WaveTable[((int)(DataS1*31))+osc1wave];
-        DataS2 += SS2 * viv1amo * fm1amo;
-        if (DataS2 >= 1.0f)DataS2 -= 1.0f;
-        float SV2 = Moldfairy2.WaveTable[((int)(DataS2*31))+osc1wave];
-        DataS3 += SS3 * viv1amo * fm1amo;
-        if (DataS3 >= 1.0f)DataS3 -= 1.0f;
-        float SV3 = Moldfairy2.WaveTable[((int)(DataS3*31))+osc1wave];
-        DataS4 += SS4 * viv1amo * fm1amo;
-        if (DataS4 >= 1.0f)DataS4 -= 1.0f;
-        float SV4 = Moldfairy2.WaveTable[((int)(DataS4*31))+osc1wave];
-        DataS5 += SS5 * viv1amo * fm1amo;
-        if (DataS5 >= 1.0f)DataS5 -= 1.0f;
-        float SV5 = Moldfairy2.WaveTable[((int)(DataS5*31))+osc1wave];
-        DataS6 += SS6 * viv1amo * fm1amo;
-        if (DataS6 >= 1.0f)DataS6 -= 1.0f;
-        float SV6 = Moldfairy2.WaveTable[((int)(DataS6*31))+osc1wave];
-        DataS7 += SS7 * viv1amo * fm1amo;
-        if (DataS7 >= 1.0f)DataS7 -= 1.0f;
-        float SV7 = Moldfairy2.WaveTable[((int)(DataS7*31))+osc1wave];
-        DataS8 += SS8 * viv1amo * fm1amo;
-        if (DataS8 >= 1.0f)DataS8 -= 1.0f;
-        float SV8 = Moldfairy2.WaveTable[((int)(DataS8*31))+osc1wave];
-
-        float onoroff2 = Moldfairy2.Ssawisonoroff[0+numvoice];
-        float onoroff4 = Moldfairy2.Ssawisonoroff[1+numvoice];
-        float onoroff6 = Moldfairy2.Ssawisonoroff[2+numvoice];
-        float onoroff8 = Moldfairy2.Ssawisonoroff[3+numvoice];
-
-        cDataS1 += cSS1 * viv4amo * fm4amo;
-        if (cDataS1 >= 1.0f)cDataS1 -= 1.0f;
-        float cSV1 = Moldfairy2.WaveTable[((int)(cDataS1*31))+osc4wave];
-        cDataS2 += cSS2 * viv4amo * fm4amo;
-        if (cDataS2 >= 1.0f)cDataS2 -= 1.0f;
-        float cSV2 = Moldfairy2.WaveTable[((int)(cDataS2*31))+osc4wave];
-        cDataS3 += cSS3 * viv4amo * fm4amo;
-        if (cDataS3 >= 1.0f)cDataS3 -= 1.0f;
-        float cSV3 = Moldfairy2.WaveTable[((int)(cDataS3*31))+osc4wave];
-        cDataS4 += cSS4 * viv4amo * fm4amo;
-        if (cDataS4 >= 1.0f)cDataS4 -= 1.0f;
-        float cSV4 = Moldfairy2.WaveTable[((int)(cDataS4*31))+osc4wave];
-        cDataS5 += cSS5 * viv4amo * fm4amo;
-        if (cDataS5 >= 1.0f)cDataS5 -= 1.0f;
-        float cSV5 = Moldfairy2.WaveTable[((int)(cDataS5*31))+osc4wave];
-        cDataS6 += cSS6 * viv4amo * fm4amo;
-        if (cDataS6 >= 1.0f)cDataS6 -= 1.0f;
-        float cSV6 = Moldfairy2.WaveTable[((int)(cDataS6*31))+osc4wave];
-        cDataS7 += cSS7 * viv4amo * fm4amo;
-        if (cDataS7 >= 1.0f)cDataS7 -= 1.0f;
-        float cSV7 = Moldfairy2.WaveTable[((int)(cDataS7*31))+osc4wave];
-        cDataS8 += cSS8 * viv4amo * fm4amo;
-        if (cDataS8 >= 1.0f)cDataS8 -= 1.0f;
-        float cSV8 = Moldfairy2.WaveTable[((int)(cDataS8*31))+osc4wave];
-
-        float onoroff2c = Moldfairy2.Ssawisonoroff[0+numvoice4];
-        float onoroff4c = Moldfairy2.Ssawisonoroff[1+numvoice4];
-        float onoroff6c = Moldfairy2.Ssawisonoroff[2+numvoice4];
-        float onoroff8c = Moldfairy2.Ssawisonoroff[3+numvoice4];
-
-        DataS1b += bSS1 * viv3amo * fm3amo;
-        if (DataS1b >= 1.0f)DataS1b -= 1.0f;
-        float SV1b = Moldfairy2.WaveTable[((int)(DataS1b*31))+osc3wave];
-        DataS2b += bSS2 * viv3amo * fm3amo;
-        if (DataS2b >= 1.0f)DataS2b -= 1.0f;
-        float SV2b = Moldfairy2.WaveTable[((int)(DataS2b*31))+osc3wave];
-        DataS3b += bSS3 * viv3amo * fm3amo;
-        if (DataS3b >= 1.0f)DataS3b -= 1.0f;
-        float SV3b = Moldfairy2.WaveTable[((int)(DataS3b*31))+osc3wave];
-        DataS4b += bSS4 * viv3amo * fm3amo;
-        if (DataS4b >= 1.0f)DataS4b -= 1.0f;
-        float SV4b = Moldfairy2.WaveTable[((int)(DataS4b*31))+osc3wave];
-        DataS5b += bSS5 * viv3amo * fm3amo;
-        if (DataS5b >= 1.0f)DataS5b -= 1.0f;
-        float SV5b = Moldfairy2.WaveTable[((int)(DataS5b*31))+osc3wave];
-        DataS6b += bSS6 * viv3amo * fm3amo;
-        if (DataS6b >= 1.0f)DataS6b -= 1.0f;
-        float SV6b = Moldfairy2.WaveTable[((int)(DataS6b*31))+osc3wave];
-        DataS7b += bSS7 * viv3amo * fm3amo;
-        if (DataS7b >= 1.0f)DataS7b -= 1.0f;
-        float SV7b = Moldfairy2.WaveTable[((int)(DataS7b*31))+osc3wave];
-        DataS8b += bSS8 * viv3amo * fm3amo;
-        if (DataS8b >= 1.0f)DataS8b -= 1.0f;
-        float SV8b = Moldfairy2.WaveTable[((int)(DataS8b*31))+osc3wave];
-
-        float onoroff2b = Moldfairy2.Ssawisonoroff[0+numvoice3];
-        float onoroff4b = Moldfairy2.Ssawisonoroff[1+numvoice3];
-        float onoroff6b = Moldfairy2.Ssawisonoroff[2+numvoice3];
-        float onoroff8b = Moldfairy2.Ssawisonoroff[3+numvoice3];
-
-        float osc4R = (osc4 + (((cSV1*onoroff2c) + (cSV3*onoroff4c) + (cSV5*onoroff6c) + (cSV7*onoroff8c)) * 0.2f))* volme4;
-        float osc4L = (osc4 + (((cSV2*onoroff2c) + (cSV4*onoroff4c) + (cSV6*onoroff6c) + (cSV8*onoroff8c)) * 0.2f))* volme4;
-
-        float osc3L = (osc3 + (((SV1b*onoroff2b) + (SV3b*onoroff4b) + (SV5b*onoroff6b) + (SV7b*onoroff8b)) * 0.2f))* volme3;
-        float osc3R = (osc3 + (((SV2b*onoroff2b) + (SV4b*onoroff4b) + (SV6b*onoroff6b) + (SV8b*onoroff8b)) * 0.2f))* volme3;
-
-        float osc2R = (osc2 + (((aSV1*onoroff2a) + (aSV3*onoroff4a) + (aSV5*onoroff6a) + (aSV7*onoroff8a)) * 0.2f))* volme2;
-        float osc2L = (osc2 + (((aSV2*onoroff2a) + (aSV4*onoroff4a) + (aSV6*onoroff6a) + (aSV8*onoroff8a)) * 0.2f))* volme2;
-
-        float osc1L = (osc1 + (((SV1*onoroff2) + (SV3*onoroff4) + (SV5*onoroff6) + (SV7*onoroff8)) * 0.2f))* volme1;
-        float osc1R = (osc1 + (((SV2*onoroff2) + (SV4*onoroff4) + (SV6*onoroff6) + (SV8*onoroff8)) * 0.2f))* volme1;
-
-        float lcha = (osc1L + osc2L + osc3L + osc4L) * VolENV;
-        float rcha = (osc1R + osc2R + osc3R + osc4R) * VolENV;
-
+        float lcha = (((out1[0]*volme1)*Moldfairy2.gainfix[numV])+((out2[0]*volme2)*Moldfairy2.gainfix[numV2])+((out3[0]*volme3)*Moldfairy2.gainfix[numV3])+((out4[0]*volme4)*Moldfairy2.gainfix[numV4]))*VolENV;
+        float rcha = (((out1[1]*volme1)*Moldfairy2.gainfix[numV])+((out2[1]*volme2)*Moldfairy2.gainfix[numV2])+((out3[1]*volme3)*Moldfairy2.gainfix[numV3])+((out4[1]*volme4)*Moldfairy2.gainfix[numV4]))*VolENV;
         chL[i] += lcha;
         chR[i] += rcha;
 
@@ -876,15 +753,24 @@ void renderNextBlock (AudioBuffer<float> &output, int startSample, int numSample
     int osc3wave =0;
     int osc4wave =0;
 
+    float osc1ph[8];
+    float osc1dt[8];
+    float osc2ph[8];
+    float osc2dt[8];
+    float osc3ph[8];
+    float osc3dt[8];
+    float osc4ph[8];
+    float osc4dt[8];
+
     float vivla = 0.0f;
     float vivData = 0.0f;
 
     float modENV = 0.0f;
 
-    int numvoice =0;
-    int numvoice2 =0;
-    int numvoice3 =0;
-    int numvoice4 =0;
+    int numV =0;
+    int numV2 =0;
+    int numV3 =0;
+    int numV4 =0;
 
     bool SuperSaw = false;
     bool SuperSaw2 = false;
@@ -902,84 +788,6 @@ void renderNextBlock (AudioBuffer<float> &output, int startSample, int numSample
     float PH4 = 0.0f;
 
     float PHW = 0.0f;
-
-    float Data1 = 0.0f;
-    float Data2 = 0.0f;
-    float Data3 = 0.0f;
-    float Data4 = 0.0f;
-
-    float SS1 = 0.0f;
-    float SS2 = 0.0f;
-    float SS3 = 0.0f;
-    float SS4 = 0.0f;
-    float SS5 = 0.0f;
-    float SS6 = 0.0f;
-    float SS7 = 0.0f;
-    float SS8 = 0.0f;
-
-    float DataS1 = 0.0f;
-    float DataS2 = 0.0f;
-    float DataS3 = 0.0f;
-    float DataS4 = 0.0f;
-    float DataS5 = 0.0f;
-    float DataS6 = 0.0f;
-    float DataS7 = 0.0f;
-    float DataS8 = 0.0f;
-
-    float bSS1 = 0.0f;
-    float bSS2 = 0.0f;
-    float bSS3 = 0.0f;
-    float bSS4 = 0.0f;
-    float bSS5 = 0.0f;
-    float bSS6 = 0.0f;
-    float bSS7 = 0.0f;
-    float bSS8 = 0.0f;
-
-    float DataS1b = 0.0f;
-    float DataS2b = 0.0f;
-    float DataS3b = 0.0f;
-    float DataS4b = 0.0f;
-    float DataS5b = 0.0f;
-    float DataS6b = 0.0f;
-    float DataS7b = 0.0f;
-    float DataS8b = 0.0f;
-
-    float aSS1 = 0.0f;
-    float aSS2 = 0.0f;
-    float aSS3 = 0.0f;
-    float aSS4 = 0.0f;
-    float aSS5 = 0.0f;
-    float aSS6 = 0.0f;
-    float aSS7 = 0.0f;
-    float aSS8 = 0.0f;
-
-    float aDataS1 = 0.0f;
-    float aDataS2 = 0.0f;
-    float aDataS3 = 0.0f;
-    float aDataS4 = 0.0f;
-    float aDataS5 = 0.0f;
-    float aDataS6 = 0.0f;
-    float aDataS7 = 0.0f;
-    float aDataS8 = 0.0f;
-
-    float cSS1 = 0.0f;
-    float cSS2 = 0.0f;
-    float cSS3 = 0.0f;
-    float cSS4 = 0.0f;
-    float cSS5 = 0.0f;
-    float cSS6 = 0.0f;
-    float cSS7 = 0.0f;
-    float cSS8 = 0.0f;
-
-    float cDataS1 = 0.0f;
-    float cDataS2 = 0.0f;
-    float cDataS3 = 0.0f;
-    float cDataS4 = 0.0f;
-    float cDataS5 = 0.0f;
-    float cDataS6 = 0.0f;
-    float cDataS7 = 0.0f;
-    float cDataS8 = 0.0f;
-
 private:
 
     juce::ADSR ENV;
