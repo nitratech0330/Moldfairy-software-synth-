@@ -10,6 +10,8 @@
 
 #include <algorithm>
 
+#include <cstdint>
+
 //==============================================================================
 AudioPluginAudioProcessor::AudioPluginAudioProcessor()
      : AudioProcessor (BusesProperties()
@@ -484,18 +486,26 @@ public: Wave (AudioPluginAudioProcessor& p) : Moldfairy2 (p)
 {
 
     for (int i=0; i<8; ++i){
-        OSCdata1[i]=0.0f;
-        OSCdata2[i]=0.0f;
-        OSCdata3[i]=0.0f;
-        OSCdata4[i]=0.0f;
+        OSCdata1[i]=0;
+        OSCdata2[i]=0;
+        OSCdata3[i]=0;
+        OSCdata4[i]=0;
+
+        OSC1i[i]=0;
+        OSC2i[i]=0;
+        OSC3i[i]=0;
+        OSC4i[i]=0;
+
         OSC1U[i]=0.0f;
         OSC2U[i]=0.0f;
         OSC3U[i]=0.0f;
         OSC4U[i]=0.0f;
     }
+
     for (int i=0; i<4; ++i){
     voicegain[i]=0;
     }
+
     auto attack = Moldfairy2.atta->load();
     auto sustin = Moldfairy2.sust->load();
     auto decay = Moldfairy2.deca->load();
@@ -581,7 +591,7 @@ void startNote (int Notenum, float Velocity, juce::SynthesiserSound*, int) overr
     
     
         float vivfrq = Moldfairy2.OSCVIS->load();
-        vivla = vivfrq / Rate;
+        vivla = (uint32_t)((vivfrq / Rate)*4294967296.0f);
 
     Moldfairy2.envshap = (int)24 * (static_cast<int>(Moldfairy2.shapetable->load()));
    
@@ -619,6 +629,12 @@ void startNote (int Notenum, float Velocity, juce::SynthesiserSound*, int) overr
         OSC2U[2+i]=OSC2U[1+i]*Damo2;
         OSC3U[2+i]=OSC3U[1+i]*Damo3;
         OSC4U[2+i]=OSC4U[1+i]*Damo4;
+    }
+    for (int i=0; i<8; ++i){
+        OSC1i[i] = (uint32_t)(OSC1U[i]*4294967296.0f);
+        OSC2i[i] = (uint32_t)(OSC2U[i]*4294967296.0f);
+        OSC3i[i] = (uint32_t)(OSC3U[i]*4294967296.0f);
+        OSC4i[i] = (uint32_t)(OSC4U[i]*4294967296.0f);
     }
    
     ENV.noteOn();
@@ -675,8 +691,7 @@ void renderNextBlock (AudioBuffer<float> &output, int startSample, int numSample
         modENV = Moldfairy2.ENVtypes[((int)(Menv*23))+Moldfairy2.Modenvshap];
         
         vivData += vivla;
-        if (vivData >= 1.0f)vivData -= 1.0f;
-        float viv = Moldfairy2.WaveTable[((int)(vivData*31))+32];
+        float viv = Moldfairy2.WaveTable[(vivData >> 27)+32];
 
         float out1[2]; float out2[2];
         float out3[2]; float out4[2];
@@ -691,29 +706,28 @@ void renderNextBlock (AudioBuffer<float> &output, int startSample, int numSample
         for (int x=0;x<8;++x){
 
             float viv4= 1.0f-(viv*vivamo4);
-            float fm4= 1.0f-(OSCdata1[x]*FMamo4);
-            OSCdata4[x]+=(OSC4U[x]*viv4)*fm4;
-            if(OSCdata4[x]>=1.0f)OSCdata4[x]-=1.0f;
-            out4[(x+2)%2]+=Moldfairy2.WaveTable[((int)(OSCdata4[x]*31))+osc4wave]*oscindex[x+numvoice4];
+            float fm4= 1.0f-(Moldfairy2.WaveTable[(OSCdata1[x] >> 27)+osc1wave]*FMamo4);
+            uint32_t ph4 = uint32_t((OSC4i[x] * viv4)*fm4);
+            OSCdata4[x]+=ph4;
+            out4[(x+2)%2]+=Moldfairy2.WaveTable[((OSCdata4[x] >> 27))+osc4wave]*oscindex[x+numvoice4];
          
-
             float viv3= 1.0f-(viv*vivamo3);
-            float fm3= 1.0f-(OSCdata4[x]*FMamo3);
-            OSCdata3[x]+=(OSC3U[x]*viv3)*fm3;
-            if(OSCdata3[x]>=1.0f)OSCdata3[x]-=1.0f;
-            out3[(x+2)%2]+=Moldfairy2.WaveTable[((int)(OSCdata3[x]*31))+osc3wave]*oscindex[x+numvoice3];
+            float fm3= 1.0f-(Moldfairy2.WaveTable[(OSCdata4[x] >> 27)+osc4wave]*FMamo3);
+            uint32_t ph3 = uint32_t((OSC3i[x] * viv3)*fm3);
+            OSCdata3[x]+=ph3;
+            out3[(x+2)%2]+=Moldfairy2.WaveTable[(OSCdata3[x] >> 27)+osc3wave]*oscindex[x+numvoice3];
 
             float viv2= 1.0f-(viv*vivamo2);
-            float fm2= 1.0f-(OSCdata3[x]*FMamo2);
-            OSCdata2[x]+=(OSC2U[x]*viv2)*fm2;
-            if(OSCdata2[x]>=1.0f)OSCdata2[x]-=1.0f;
-            out2[(x+2)%2]+=Moldfairy2.WaveTable[((int)(OSCdata2[x]*31))+osc2wave]*oscindex[x+numvoice2];
+            float fm2= 1.0f-(Moldfairy2.WaveTable[(OSCdata3[x] >> 27)+osc3wave]*FMamo2);
+            uint32_t ph2 = uint32_t((OSC2i[x] * viv2)*fm2);
+            OSCdata2[x]+=ph2;
+            out2[(x+2)%2]+=Moldfairy2.WaveTable[(OSCdata2[x] >> 27)+osc2wave]*oscindex[x+numvoice2];
 
             float viv1= 1.0f-(viv*vivamo1);
-            float fm1= 1.0f-(OSCdata2[x]*FMamo1);
-            OSCdata1[x]+=(OSC1U[x]*viv1)*fm1;
-            if(OSCdata1[x]>=1.0f)OSCdata1[x]-=1.0f;
-            out1[(x+2)%2]+=Moldfairy2.WaveTable[((int)(OSCdata1[x]*31))+osc1wave]*oscindex[x+numvoice];
+            float fm1= 1.0f-(Moldfairy2.WaveTable[(OSCdata2[x] >> 27)+osc2wave]*FMamo1);
+            uint32_t ph1 = uint32_t((OSC1i[x] * viv1)*fm1);
+            OSCdata1[x]+=ph1;
+            out1[(x+2)%2]+=Moldfairy2.WaveTable[(OSCdata1[x] >> 27)+osc1wave]*oscindex[x+numvoice];
 
         }
 
@@ -723,8 +737,8 @@ void renderNextBlock (AudioBuffer<float> &output, int startSample, int numSample
             waveout[z]=((out1[z]*gainfix[voicegain[0]]*volme1)+(out2[z]*gainfix[voicegain[1]]*volme2)+(out3[z]*gainfix[voicegain[2]]*volme3)+(out4[z]*gainfix[voicegain[3]]*volme4))*VolENV;
         }
 
-        chL[i] += waveout[0];
-        chR[i] += waveout[1];
+        chL[i] += waveout[0]*0.5f;
+        chR[i] += waveout[1]*0.5f;
 
     }
 
@@ -735,8 +749,8 @@ void renderNextBlock (AudioBuffer<float> &output, int startSample, int numSample
     int osc3wave =0;
     int osc4wave =0;
 
-    float vivla = 0.0f;
-    float vivData = 0.0f;
+    uint32_t vivla = 0;
+    uint32_t vivData = 0;
 
     float modENV = 0.0f;
 
@@ -759,10 +773,15 @@ void renderNextBlock (AudioBuffer<float> &output, int startSample, int numSample
 
     float PHW = 0.0f;
 
-    float OSCdata1[8];
-    float OSCdata2[8];
-    float OSCdata3[8];
-    float OSCdata4[8];
+    uint32_t OSCdata1[8];
+    uint32_t OSCdata2[8];
+    uint32_t OSCdata3[8];
+    uint32_t OSCdata4[8];
+
+    uint32_t OSC1i[8];
+    uint32_t OSC2i[8];
+    uint32_t OSC3i[8];
+    uint32_t OSC4i[8];
 
     float OSC1U[8];
     float OSC2U[8];
