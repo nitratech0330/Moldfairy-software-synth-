@@ -1,10 +1,6 @@
 # Moldfairy (Software Synth)
 
 Synth for Trance music
-<img width="843" height="425" alt="Image" src="https://github.com/user-attachments/assets/aaa8dbd9-c2e8-4bac-87e4-c19050f36252" />
-
-<img width="1200" height="360" alt="Image" src="https://github.com/user-attachments/assets/2f565864-4f04-4636-83ee-94e41455964c" />
-
 
 # Features
 
