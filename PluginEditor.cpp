@@ -1,472 +1,331 @@
-#define JUCE_FORCE_LEGACY_PARAMETER_AUTOMATION_TYPE 1
-
+#include "PluginProcessor.h"
+#include "PluginEditor.h"
 #include "JuceHeader.h"
 
-#include "PluginProcessor.h"
+#define JUCE_FORCE_LEGACY_PARAMETER_AUTOMATION_TYPE 1
 
-#include "PluginEditor.h"
+#include <string.h>
+
+#include <algorithm>
+
+#include <cmath>
+
+#include <vector>
 
 //==============================================================================
 AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAudioProcessor& p)
-    : AudioProcessorEditor (&p), Moldfairy2 (p)
+    : AudioProcessorEditor (&p), processorRef (p)
 {
-    //juce::ignoreUnused (Moldfairy2);
-    imagefile = file.getChildFile("Contents")
+    juce::File file = juce::File::getSpecialLocation(juce::File::SpecialLocationType::currentApplicationFile);
+    for (int i=0; i<7; ++i){
+        files[i]=file.getChildFile("Contents")
                     .getChildFile("Resources")
                     .getChildFile("images")
-                    .getChildFile("knob8.png");
-    imagefile2 = file.getChildFile("Contents")
-                    .getChildFile("Resources")
-                    .getChildFile("images")
-                    .getChildFile("knob4.png");
-    imagefile3 = file.getChildFile("Contents")
-                    .getChildFile("Resources")
-                    .getChildFile("images")
-                    .getChildFile("knob2.png");
-    imagefile4 = file.getChildFile("Contents")
-                    .getChildFile("Resources")
-                    .getChildFile("images")
-                    .getChildFile("knob15.png");
-    imagefile5 = file.getChildFile("Contents")
-                    .getChildFile("Resources")
-                    .getChildFile("images")
-                    .getChildFile("back.png");
-    imagefile6 = file.getChildFile("Contents")
-                    .getChildFile("Resources")
-                    .getChildFile("images")
-                    .getChildFile("knob26.png");
-    imagefile7 = file.getChildFile("Contents")
-                    .getChildFile("Resources")
-                    .getChildFile("images")
-                    .getChildFile("knob23.png");
-    imagefile8 = file.getChildFile("Contents")
-                    .getChildFile("Resources")
-                    .getChildFile("images")
-                    .getChildFile("knob21.png");
-    imagefile9 = file.getChildFile("Contents")
-                    .getChildFile("Resources")
-                    .getChildFile("images")
-                    .getChildFile("knob22.png");
-    imagefile10 = file.getChildFile("Contents")
-                    .getChildFile("Resources")
-                    .getChildFile("images")
-                    .getChildFile("knob18.png");
-    imagefile11 = file.getChildFile("Contents")
-                    .getChildFile("Resources")
-                    .getChildFile("images")
-                    .getChildFile("knob19.png");
-    imagefile12 = file.getChildFile("Contents")
-                    .getChildFile("Resources")
-                    .getChildFile("images")
-                    .getChildFile("knob20.png");
-
-    if (imagefile7.existsAsFile()){
-        knob6 = juce::ImageFileFormat::loadFrom(imagefile7);
+                    .getChildFile(IMGname[i]);
+        if (files[i].existsAsFile()){
+            IMGs[i]=juce::ImageFileFormat::loadFrom(files[i]);
+        }
     }
-    if (imagefile5.existsAsFile()){
-        back = juce::ImageFileFormat::loadFrom(imagefile5);
-    }
-    if (imagefile.existsAsFile()){
-        knob = juce::ImageFileFormat::loadFrom(imagefile);
-    }
-    if (imagefile2.existsAsFile()){
-        knob2 = juce::ImageFileFormat::loadFrom(imagefile2);
-    }
-    if (imagefile3.existsAsFile()){
-        knob3 = juce::ImageFileFormat::loadFrom(imagefile3);
-    }
-    if (imagefile4.existsAsFile()){
-        knob4 = juce::ImageFileFormat::loadFrom(imagefile4);
-    }
-    if (imagefile6.existsAsFile()){
-        knob5 = juce::ImageFileFormat::loadFrom(imagefile6);
-    }
-    if (imagefile8.existsAsFile()){
-        knob7 = juce::ImageFileFormat::loadFrom(imagefile8);
-    }
-    if (imagefile9.existsAsFile()){
-        knob8 = juce::ImageFileFormat::loadFrom(imagefile9);
-    }
-    if (imagefile10.existsAsFile()){
-        knob9 = juce::ImageFileFormat::loadFrom(imagefile10);
-    }
-    if (imagefile11.existsAsFile()){
-        knob10 = juce::ImageFileFormat::loadFrom(imagefile11);
-    }
-    if (imagefile12.existsAsFile()){
-        knob11 = juce::ImageFileFormat::loadFrom(imagefile12);
-    }
-    
     std::vector<std::pair<juce::String, juce::Slider*>> slidermap{
-        {"VOL1", &slider1},
-        {"VOL2", &slider2},
-        {"VOL3", &slider3},
-        {"VOL4", &slider4},
+            {"Fc", &sliders2[8]},
+            {"Fr", &sliders2[9]},
+            {"FcM", &sliders2[10]},
+            {"FrM", &sliders2[11]},
 
-        {"FM1", &slider5},
-        {"FM2", &slider6},
-        {"FM3", &slider7},
-        {"FM4", &slider8},
+            {"note1", &sliders2[12]},
+            {"note2", &sliders2[13]},
+            {"note3", &sliders2[14]},
+            {"note4", &sliders2[15]},
 
-        {"CUTO", &slider9},
-        {"RESO", &slider10},
+            {"wsm", &sliders2[16]},
+            {"wst", &sliders2[17]},
+            {"wsg", &sliders2[18]},
 
-        {"SHAP", &slider15},
+            {"cho", &sliders2[19]},
+            {"chs", &sliders2[20]},
+            {"chd", &sliders2[21]},
+            {"chw", &sliders2[22]},
 
-        {"CUMO", &slider16},
+            {"DeV", &sliders2[23]},
+            {"DeF", &sliders2[24]},
+            {"DeL", &sliders2[25]},
+            {"DeR", &sliders2[26]},
 
-        {"WAVE1", &slider17},
-        {"WAVE2", &slider18},
-        {"WAVE3", &slider19},
-        {"WAVE4", &slider20},
-        {"OCT1", &slider21},
-        {"OCT2", &slider22},
-        {"OCT3", &slider23},
-        {"OCT4", &slider24},
-        {"TONE1", &slider25},
-        {"TONE2", &slider26},
-        {"TONE3", &slider27},
-        {"TONE4", &slider28},
-        {"FINE1", &slider29},
-        {"FINE2", &slider30},
-        {"FINE3", &slider31},
-        {"FINE4", &slider32},
-        {"OS1N", &slider33},
-        {"OS2N", &slider34},
-        {"OS3N", &slider35},
-        {"OS4N", &slider36},
+            {"ReV", &sliders2[27]},
+            {"ReF", &sliders2[28]},
+            {"ReD", &sliders2[29]},
+            {"ReLc", &sliders2[30]},
+            {"ReHc", &sliders2[31]},
 
-        {"MOAP", &slider41},
+            {"sldp", &sliders2[32]},
+            {"uldp", &sliders2[33]},
+            {"slo", &sliders2[34]},
+            {"ulo", &sliders2[35]},
 
-        {"REMO", &slider42},
+            {"test", &sliders2[36]},
 
-        {"VIV1", &slider43},
-        {"VIV2", &slider44},
-        {"VIV3", &slider45},
-        {"VIV4", &slider46},
-
-        {"VIS1", &slider47},
-
-        {"OS1D", &slider49},
-        {"OS2D", &slider50},
-        {"OS3D", &slider51},
-        {"OS4D", &slider52},
-
-        {"DELA", &slider[1]},
-        {"DELAF", &slider[2]},
-        {"DELaL", &slider[3]},
-        {"DELaR", &slider[4]},
-        {"DELAFC", &slider[5]},
+            {"compD", &sliders2[37]},
+            {"comp", &sliders2[38]},
+            {"biv", &sliders2[39]}
+        };
         
-
-        {"REVEV", &slider[7]},
-        {"REVEFC", &slider[8]},
-        {"REVEH", &slider[9]},
-        {"REVEL", &slider[10]}
-    };
-
+        for (int i=0;i<4;++i){
+            for (int x=0;x<9;++x){
+            slidermap.push_back({processorRef.oscpid[i][x], &oscsliders[i][x]});
+            }
+            
+        }
     std::vector<std::pair<juce::String, juce::Slider*>> slidermap2{
-        {"FIAT", &slider11},
-        {"FISU", &slider12},
-        {"ATTA", &slider13},
-        {"SUST", &slider14},
-
-        {"FIDE", &slider37},
-        {"FIRE", &slider38},
-        {"DECA", &slider39},
-        {"RELE", &slider40},
-        
-    };
-
-    std::vector<std::pair<juce::String, juce::Slider*>> slidermap3{
-        {"DELAFT", &slider[6]}
-    };
+            {"att", &sliders2[0]},{"dec", &sliders2[1]},{"sus", &sliders2[2]},{"rel", &sliders2[3]},
+            {"matt", &sliders2[4]},{"mdec", &sliders2[5]},{"msus", &sliders2[6]},{"mrel", &sliders2[7]}
+        };
 
     for (const auto& [paramID, sliderPtr] : slidermap){
+        auto b = sliderPtr->getBounds();
         addAndMakeVisible(sliderPtr);
         sliderPtr->setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
         sliderPtr->setAlpha(0.0);
         sliderPtr->setSliderStyle (juce::Slider::RotaryVerticalDrag);
-        sliderPtr->onValueChange = [this](){repaint();};
-        attach.push_back(std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(p.STATES, paramID, *sliderPtr));
+        sliderPtr->onValueChange = [this, b](){repaint(b.getX(),b.getY(),b.getWidth(),b.getHeight());};
+        attach.push_back(std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(p.STATE, paramID, *sliderPtr));
         sliders.push_back(sliderPtr);
-    }
+    };
 
-    for (const auto& [paramID, sliderPtr2] : slidermap2){
-        addAndMakeVisible(sliderPtr2);
-        sliderPtr2->setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-        sliderPtr2->setAlpha(0.0);
-        sliderPtr2->setSliderStyle (juce::Slider::LinearBarVertical);
-        sliderPtr2->onValueChange = [this](){repaint();};
-        attach.push_back(std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(p.STATES, paramID, *sliderPtr2));
-    }
+    for (const auto& [paramID, sliderPtr] : slidermap2){
+        auto b = sliderPtr->getBounds();
+        addAndMakeVisible(sliderPtr);
+        sliderPtr->setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+        sliderPtr->setAlpha(0.0);
+        sliderPtr->setSliderStyle (juce::Slider::LinearVertical);
+        sliderPtr->onValueChange = [this, b](){repaint(b.getX(),b.getY(),b.getWidth(),b.getHeight());};
+        attach.push_back(std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(p.STATE, paramID, *sliderPtr));
+        sliders2v.push_back(sliderPtr);
+    };
 
-    for (const auto& [paramID, sliderPtr3] : slidermap3){
-        addAndMakeVisible(sliderPtr3);
-        sliderPtr3->setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-        sliderPtr3->setAlpha(0.0);
-        sliderPtr3->setSliderStyle (juce::Slider::LinearHorizontal);
-        sliderPtr3->onValueChange = [this](){repaint();};
-        attach.push_back(std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(p.STATES, paramID, *sliderPtr3));
-    }
+    addAndMakeVisible(B);
+    B.onClick = [this](){showmenu();};
+    B.setAlpha(0.0f);
 
-    setSize (840, 420);
+    addAndMakeVisible(B2);
+    B2.onClick = [this](){showmenu2();};
+    B2.setAlpha(0.0f);
+
+    sliders2[25].onValueChange = [this](){auto Db = sliders2[26].getBounds(); repaint(Db.getX()+50, Db.getY()+6, 60, 15);};
+    sliders2[26].onValueChange = [this](){auto Db = sliders2[26].getBounds(); repaint(Db.getX()+50, Db.getY()+20, 60, 15);};
+
+    setSize (800, 400);
+    startTimerHz(15);
 }
 
 AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()
 {
+    stopTimer();
 }
 
 //==============================================================================
 void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
 {
+    if (IMGs[6].isValid()){
+        g.drawImage(IMGs[6],0,0,800,400,0,0,800,400, false);
+    }
     
-     auto drawS = [&](const juce::Image& img, const juce::Slider& s, int X, int Y, int W, int H) 
-    {
-        auto b = s.getBounds();
-        g.drawImage (img, b.getX(), b.getY(), b.getWidth(), b.getHeight(), 
-                      X, Y, W, H, false);
-    };
-
-    auto draIndex = [&](juce::Slider& s, int F, int Px=1){
-        float N = s.valueToProportionOfLength(s.getValue());
-        int Ni = juce::jlimit(0, F, (int)(N * F))*Px;
-        return Ni;
-    };
-
-    auto drawL = [&](juce::Slider& S,const juce::Image& im, int x=32, int y=-8, int sizX=20, int sizY=20, int nX=0, int Fy=0, int f=19, int p=20, int IsizX=20, int IsizY=20){
-        auto Y = draIndex(S, f, p);
-        auto b = S.getBounds();
-        g.drawImage(im, b.getX()+x, b.getY()+y, sizX, sizY, nX, Y+Fy, IsizX, IsizY, false);
-    };
-
-    if (back.isValid()){
-       g.drawImage(back, getLocalBounds().toFloat());
-    }
-
-    if (knob.isValid()){
-       
-        float num15 = slider15.valueToProportionOfLength(slider15.getValue());
-        float num41 = slider41.valueToProportionOfLength(slider41.getValue());
-    
-        auto num15y2 = juce::jlimit(0, 19, (int)(num15 * 19))*20;
-        auto num41y2 = juce::jlimit(0, 19, (int)(num41 * 19))*20;
-        float num10 = slider10.valueToProportionOfLength(slider10.getValue());
-        float num42 = slider42.valueToProportionOfLength(slider42.getValue());
-
-        if (knob5.isValid()){
-            g.drawImage(knob5, slider[3].getBounds().getX(),  slider[3].getBounds().getY()+42, 120, 8, 0, 320+(int)(slider[3].getValue()-1)*20, 300, 20, false);
-            g.drawImage(knob5, slider[3].getBounds().getX(),  slider[3].getBounds().getY()+52, 120, 8, 0, (int)(slider[4].getValue()-1)*20, 300, 20, false);
-        }
-
-        if (knob7.isValid()){
-            auto num10y2 = juce::jlimit(0, 19, (int)(num10 * 19))*20;
-            g.drawImage(knob7, slider10.getBounds().getX()+42, slider10.getBounds().getY()-10, 22, 22, 0, num10y2, 20, 20, false);
-            auto num42y2 = juce::jlimit(0, 19, (int)(num42 * 19))*20; 
-            g.drawImage(knob7, slider42.getBounds().getX()+32, slider42.getBounds().getY()-5, 16, 16, 0, num42y2, 20, 20, false);
-            drawL(slider[2], knob7, 26, -14);
-            drawL(slider[8], knob7, 32, -10);
-        }
-
-        if (knob8.isValid()){
-           
-            float num5 = slider5.valueToProportionOfLength(slider5.getValue());
-            float num6 = slider6.valueToProportionOfLength(slider6.getValue());
-            float num7 = slider7.valueToProportionOfLength(slider7.getValue());
-            float num8 = slider8.valueToProportionOfLength(slider8.getValue());
-      
-            auto num5y2 = juce::jlimit(0, 19, (int)(num5 * 19))*20;
-            auto num6y2 = juce::jlimit(0, 19, (int)(num6 * 19))*20;
-            auto num7y2 = juce::jlimit(0, 19, (int)(num7 * 19))*20;
-            auto num8y2 = juce::jlimit(0, 19, (int)(num8 * 19))*20;
-
-            
-
-            g.drawImage(knob8, slider5.getBounds().getX()+42, slider5.getBounds().getY()-10, 22, 22, 0, num5y2, 20, 20, false);
-            g.drawImage(knob8, slider6.getBounds().getX()+42, slider6.getBounds().getY()-10, 22, 22, 0, num6y2, 20, 20, false);
-            g.drawImage(knob8, slider7.getBounds().getX()+42, slider7.getBounds().getY()-10, 22, 22, 0, num7y2, 20, 20, false);
-            g.drawImage(knob8, slider8.getBounds().getX()+42, slider8.getBounds().getY()-10, 22, 22, 0, num8y2, 20, 20, false);
-
-            g.drawImage(knob8, slider15.getBounds().getX()-11, slider15.getBounds().getY()-8, 20, 20, 0, 380-num15y2, 20, 20, false);
-            g.drawImage(knob8, slider41.getBounds().getX()-11, slider41.getBounds().getY()-4, 20, 20, 0, 380-num41y2, 20, 20, false);
-
-            drawL(slider49, knob8, 28, -4, 18, 18);
-            drawL(slider50, knob8, 28, -4, 18, 18);
-            drawL(slider51, knob8, 28, -4, 18, 18);
-            drawL(slider52, knob8, 28, -4, 18, 18);
-
-            drawL(slider[3], knob8, 10, -15);
-            drawL(slider[10], knob8, 10, -16, 16, 16);
-        }
-        
-        if (knob9.isValid()){
-             float num1 = slider1.valueToProportionOfLength(slider1.getValue());
-             float num2 = slider2.valueToProportionOfLength(slider2.getValue());
-             float num3 = slider3.valueToProportionOfLength(slider3.getValue());
-             float num4 = slider4.valueToProportionOfLength(slider4.getValue());
-       
-            auto num1y2 = juce::jlimit(0, 19, (int)(num1 * 19))*20;
-            auto num2y2 = juce::jlimit(0, 19, (int)(num2 * 19))*20;
-            auto num3y2 = juce::jlimit(0, 19, (int)(num3 * 19))*20;
-            auto num4y2 = juce::jlimit(0, 19, (int)(num4 * 19))*20;
-            
-            g.drawImage(knob9, 62, 10, 26, 26, 0, num1y2, 20, 20, false);
-            g.drawImage(knob9, 142, 10, 26, 26, 0, num2y2, 20, 20, false);
-            g.drawImage(knob9, 222, 10, 26, 26, 0, num3y2, 20, 20, false);
-            g.drawImage(knob9, 302, 10, 26, 26, 0, num4y2, 20, 20, false);
-
-            drawL(slider[1], knob9, 26, -14);
-            drawL(slider[7], knob9, 32, -10);
-        }
-        if (knob10.isValid()){
-            float num9 = slider9.valueToProportionOfLength(slider9.getValue());
-            float num16 = slider16.valueToProportionOfLength(slider16.getValue());
-           
-            auto num16y2 = juce::jlimit(0, 19, (int)(num16 * 19))*20;
-            auto num9y2 = juce::jlimit(0, 19, (int)(num9 * 19))*20;
-            g.drawImage(knob10, slider9.getBounds().getX()+42, slider9.getBounds().getY()-8, 22, 22, 0, num9y2, 20, 20, false);  
-            g.drawImage(knob10, slider16.getBounds().getX()+32, slider16.getBounds().getY()-8, 18, 18, 0, num16y2, 20, 20, false);
-            g.drawImage(knob10, slider15.getBounds().getX()+30, slider15.getBounds().getY()-6, 18, 18, 0, num15y2, 20, 20, false);
-            g.drawImage(knob10, slider41.getBounds().getX()+28, slider41.getBounds().getY()-4, 18, 18, 0, num41y2, 20, 20, false);
-
-            drawL(slider43, knob10);
-            drawL(slider44, knob10);
-            drawL(slider45, knob10);
-            drawL(slider46, knob10);
-
-            drawL(slider[4], knob10, 10, -15);
-            drawL(slider[5], knob10, 12, -16, 16, 16);
-            drawL(slider[9], knob10, 9, -16, 16, 16);
-        }
-    }
-    if (knob11.isValid()){
-
-        float num11 = slider11.valueToProportionOfLength(slider11.getValue());
-        auto num11y = juce::jlimit(0, 19, (int)(num11 * 19));
-        g.drawImage(knob11, slider11.getBounds().getX(), slider11.getBounds().getY(), slider11.getBounds().getWidth(), slider11.getBounds().getHeight(), 0, 1140-num11y*60, 24, 60, false);
-
-        float num12 = slider12.valueToProportionOfLength(slider12.getValue());
-        auto num12y = juce::jlimit(0, 19, (int)(num12 * 19));
-        g.drawImage(knob11, slider12.getBounds().getX(), slider12.getBounds().getY(), slider12.getBounds().getWidth(), slider12.getBounds().getHeight(), 0, 1140-num12y*60, 24, 60, false);
-
-        float num13 = slider13.valueToProportionOfLength(slider13.getValue());
-        auto num13y = juce::jlimit(0, 19, (int)(num13 * 19));
-        g.drawImage(knob11, slider13.getBounds().getX(), slider13.getBounds().getY(), slider13.getBounds().getWidth(), slider13.getBounds().getHeight(), 0, 1140-num13y*60, 24, 60, false);
-
-        float num14 = slider14.valueToProportionOfLength(slider14.getValue());
-        auto num14y = juce::jlimit(0, 19, (int)(num14 * 19));
-        g.drawImage(knob11, slider14.getBounds().getX(), slider14.getBounds().getY(), slider14.getBounds().getWidth(), slider14.getBounds().getHeight(), 0, 1140-num14y*60, 24, 60, false);
-
-        float num37 = slider37.valueToProportionOfLength(slider37.getValue());
-        float num38 = slider38.valueToProportionOfLength(slider38.getValue());
-        float num39 = slider39.valueToProportionOfLength(slider39.getValue());
-        float num40 = slider40.valueToProportionOfLength(slider40.getValue());
-
-        auto num37y = juce::jlimit(0, 19, (int)(num37 * 19));
-        auto num38y = juce::jlimit(0, 19, (int)(num38 * 19));
-        auto num39y = juce::jlimit(0, 19, (int)(num39 * 19));
-        auto num40y = juce::jlimit(0, 19, (int)(num40 * 19));    
-
-        drawS(knob11, slider37, 0, 1140-num37y*60, 24, 60);
-        drawS(knob11, slider38, 0, 1140-num38y*60, 24, 60);
-        drawS(knob11, slider39, 0, 1140-num39y*60, 24, 60);
-        drawS(knob11, slider40, 0, 1140-num40y*60, 24, 60);
-        
-    }
-    if (knob6.isValid()){
-        drawS(knob6, slider[6], draIndex(slider[6], 19, 60), 0, 60, 24);
-    }
-    if (knob4.isValid()){
+    if (IMGs[0].isValid()){
         for (const auto& s : sliders){
+            float n=s->valueToProportionOfLength(s->getValue());
+            int num = juce::jlimit(0, 100, (int)(n * 100));
+            int x = 60*((num+4) / 6);
+            int y = 60*((num+4) % 6);
             auto b = s->getBounds();
-            float num = s->valueToProportionOfLength(s->getValue());
-            auto f = juce::jlimit(0, 100, (int)(num * 100));
-            int y = 60*((f+4) % 6);
-            int x = 60*((f+4) / 6);
-            g.drawImage(knob4, b.getX(), b.getY(), b.getWidth(), b.getHeight(), x, y, 60, 60, false);
+            g.drawImage(IMGs[0], b.getX(), b.getY(), b.getWidth(), b.getHeight(), x, y, 60, 60, false);
         }
     }
+
+    if (IMGs[1].isValid()){
+        for (const auto& s : sliders2v){
+            float n=s->valueToProportionOfLength(s->getValue());
+            int_fast8_t num = juce::jlimit(0, 75, (int)(n * 75));
+            auto b = s->getBounds();
+            g.drawImage(IMGs[1], b.getX(), b.getY()+(75-num), 32, 32, 0, 0, 32, 32, false);
+        }
+    }
+
+    if (IMGs[2].isValid()){
+        float LUV = processorRef.Lvol;
+        LUV=1.0f-LUV;
+        LUV=LUV*LUV*LUV*LUV;
+        LUV=1.0f-LUV;
+        float RUV = processorRef.Rvol;
+        RUV=1.0f-RUV;
+        RUV=RUV*RUV*RUV*RUV;
+        RUV=1.0f-RUV;
+        int_fast8_t VUNL = LUV*45.0f;
+        int_fast8_t VUNR = RUV*45.0f;
+        g.drawImage(IMGs[2], 625, 350, 70, 35, 0, VUNL*100, 200, 100, false);
+        g.drawImage(IMGs[2], 700, 350, 70, 35, 0, VUNR*100, 200, 100, false);
+    }
+
+    if (IMGs[3].isValid()){
+        auto Rb = sliders2[26].getBounds();
+        g.drawImage(IMGs[3],Rb.getX()+50, Rb.getY()+6, 60, 15, 0, (int_fast16_t)(320+sliders2[25].getValue()*20), 300, 20, false);
+        g.drawImage(IMGs[3],Rb.getX()+50, Rb.getY()+20, 60, 15, 0, (int_fast16_t)(sliders2[26].getValue()*20), 300, 20, false);
+    }
+
+    if (IMGs[5].isValid()){
+        auto b = B.getBounds();
+        auto b2 = B2.getBounds();
+        g.drawImage(IMGs[5], b.getX(), b.getY(), b.getWidth(), b.getHeight(), 0, (menunum*40), 120, 40, false);
+        g.drawImage(IMGs[5], b2.getX(), b2.getY(), b2.getWidth(), b2.getHeight(), 0, (menunum2*40), 120, 40, false);
+    }
+    
 }
 
 void AudioPluginAudioProcessorEditor::resized()
 {
-    // This is generally where you'll want to lay out the positions of any
-    // subcomponents in your editor..
-    slider1.setBounds(30, 30, 60, 60);
-    slider2.setBounds(110, 30, 60, 60);
-    slider3.setBounds(190, 30, 60, 60);
-    slider4.setBounds(270, 30, 60, 60);
+    oscsliders[0][1].setBounds(34, 25, 20, 20);
+    oscsliders[0][2].setBounds(28, 47, 25, 25);
+    oscsliders[0][0].setBounds(50, 25, 50, 50);
+    oscsliders[0][3].setBounds(100, 25, 50, 50);
+    oscsliders[0][6].setBounds(150, 25, 50, 50);
+    oscsliders[0][7].setBounds(200, 25, 50, 50);
+    oscsliders[0][8].setBounds(250, 25, 50, 50);
 
-    slider5.setBounds(365, 40, 50, 50);
-    slider6.setBounds(445, 40, 50, 50);
-    slider7.setBounds(525, 40, 50, 50);
-    slider8.setBounds(605, 40, 50, 50);
-    slider9.setBounds(685, 40, 60, 60);
-    slider10.setBounds(765, 40, 60, 60);
+    oscsliders[0][5].setBounds(302, 50, 20, 20);
+    oscsliders[0][4].setBounds(300, 25, 25, 25);
 
-    slider11.setBounds(365, 110, 20, 100);
-    slider12.setBounds(445, 110, 20, 100);
-    slider13.setBounds(525, 110, 20, 100);
-    slider14.setBounds(605, 110, 20, 100);
-    slider15.setBounds(698, 122, 38, 38);
-    slider16.setBounds(760, 114, 40, 40);
+    //oscsliders[0][5].setBounds(100, 70, 50, 50);
 
-    //==Wave
-    slider17.setBounds(42, 100, 35, 35);
-    slider18.setBounds(122, 100, 35, 35);
-    slider19.setBounds(202, 100, 35, 35);
-    slider20.setBounds(282, 100, 35, 35);
-    //==Oct
-    slider21.setBounds(36, 140, 25, 25);
-    slider22.setBounds(116, 140, 25, 25);
-    slider23.setBounds(197, 140, 25, 25);
-    slider24.setBounds(277, 140, 25, 25);
-    //==Tone
-    slider25.setBounds(52, 170, 25, 25);
-    slider26.setBounds(132, 170, 25, 25);
-    slider27.setBounds(213, 170, 25, 25);
-    slider28.setBounds(293, 170, 25, 25);
-    //==Fine
-    slider29.setBounds(42, 200, 25, 25);
-    slider30.setBounds(122, 200, 25, 25);
-    slider31.setBounds(203, 200, 25, 25);
-    slider32.setBounds(283, 200, 25, 25);
-    //==Uni
-    slider33.setBounds(62, 237, 35, 35);
-    slider34.setBounds(142, 237, 35, 35);
-    slider35.setBounds(223, 237, 35, 35);
-    slider36.setBounds(303, 237, 35, 35);
+    oscsliders[1][1].setBounds(484, 25, 20, 20);
+    oscsliders[1][2].setBounds(478, 47, 25, 25);
+    oscsliders[1][0].setBounds(500, 25, 50, 50);
+    oscsliders[1][3].setBounds(550, 25, 50, 50);
+    oscsliders[1][6].setBounds(600, 25, 50, 50);
+    oscsliders[1][7].setBounds(650, 25, 50, 50);
+    oscsliders[1][8].setBounds(700, 25, 50, 50);
 
-    slider37.setBounds(405, 110, 20, 100);
-    slider38.setBounds(485, 110, 20, 100);
-    slider39.setBounds(565, 110, 20, 100);
-    slider40.setBounds(645, 110, 20, 100);
-    slider41.setBounds(722, 172, 34, 34);
-    slider42.setBounds(782, 166, 36, 36);
+    oscsliders[1][5].setBounds(754, 51, 20, 20);
+    oscsliders[1][4].setBounds(752, 26, 25, 25);
 
-    slider43.setBounds(370, 230, 40, 40);
-    slider44.setBounds(450, 230, 40, 40);
-    slider45.setBounds(530, 230, 40, 40);
-    slider46.setBounds(610, 230, 40, 40);
-    slider47.setBounds(683, 226, 50, 50);
+    oscsliders[2][1].setBounds(34, 120, 20, 20);
+    oscsliders[2][2].setBounds(28, 142, 25, 25);
+    oscsliders[2][0].setBounds(50, 120, 50, 50);
+    oscsliders[2][3].setBounds(100, 120, 50, 50);
+    oscsliders[2][6].setBounds(150, 120, 50, 50);
+    oscsliders[2][7].setBounds(200, 120, 50, 50);
+    oscsliders[2][8].setBounds(250, 120, 50, 50);
 
-    //==Detune
-    slider49.setBounds(32, 280, 35, 35);
-    slider50.setBounds(112, 280, 35, 35);
-    slider51.setBounds(193, 280, 35, 35);
-    slider52.setBounds(273, 280, 35, 35);
+    oscsliders[2][5].setBounds(302, 145, 20, 20);
+    oscsliders[2][4].setBounds(300, 120, 25, 25);
 
-    //==delay
-    slider[3].setBounds(345, 290, 38, 38);
-    slider[4].setBounds(425, 290, 38, 38);
-    slider[2].setBounds(486, 336, 38, 38);
-    slider[1].setBounds(566, 336, 38, 38);
-    slider[5].setBounds(529, 292, 34, 34);
-    slider[6].setBounds(375, 352, 60, 24);
+    oscsliders[3][1].setBounds(484, 120, 20, 20);
+    oscsliders[3][2].setBounds(478, 142, 25, 25);
+    oscsliders[3][0].setBounds(500, 120, 50, 50);
+    oscsliders[3][3].setBounds(550, 120, 50, 50);
+    oscsliders[3][6].setBounds(600, 120, 50, 50);
+    oscsliders[3][7].setBounds(650, 120, 50, 50);
+    oscsliders[3][8].setBounds(700, 120, 50, 50);
 
-    //==Reverb
-    slider[9].setBounds(674, 354, 36, 36);
-    slider[10].setBounds(636, 313, 36, 36);
-    slider[7].setBounds(745, 353, 40, 40);
-    slider[8].setBounds(705, 308, 40, 40);
+    oscsliders[3][5].setBounds(754, 146, 20, 20);
+    oscsliders[3][4].setBounds(752, 121, 25, 25);
+
+    sliders2[0].setBounds(333, 35, 32, 100);
+    sliders2[1].setBounds(369, 35, 32, 100);
+    sliders2[2].setBounds(400, 35, 32, 100);
+    sliders2[3].setBounds(435, 35, 32, 100);
+
+    sliders2[4].setBounds(333, 155, 32, 100);
+    sliders2[5].setBounds(369, 155, 32, 100);
+    sliders2[6].setBounds(400, 155, 32, 100);
+    sliders2[7].setBounds(435, 155, 32, 100);
+
+    sliders2[8].setBounds(40, 195, 60, 60);
+    sliders2[9].setBounds(110, 195, 60, 60);
+    sliders2[10].setBounds(190, 200, 40, 40);
+    sliders2[11].setBounds(240, 200, 40, 40);
+
+    sliders2[12].setBounds(15, 30, 20, 20);
+    sliders2[13].setBounds(465, 30, 20, 20);
+    sliders2[14].setBounds(15, 130, 20, 20);
+    sliders2[15].setBounds(465, 130, 20, 20);
+
+    sliders2[16].setBounds(502, 210, 40, 40);
+    sliders2[17].setBounds(552, 210, 40, 40);
+    sliders2[18].setBounds(602, 210, 40, 40);
+    sliders2[19].setBounds(552, 270, 40, 40);
+    sliders2[20].setBounds(602, 270, 40, 40);
+    sliders2[21].setBounds(652, 270, 40, 40);
+    sliders2[22].setBounds(702, 270, 40, 40);
+
+    sliders2[23].setBounds(40, 270, 40, 40);
+    sliders2[24].setBounds(90, 270, 40, 40);
+    sliders2[25].setBounds(140, 270, 40, 40);
+    sliders2[26].setBounds(190, 270, 40, 40);
+
+    sliders2[27].setBounds(50, 325, 40, 40);
+    sliders2[28].setBounds(100, 325, 40, 40);
+    sliders2[29].setBounds(150, 325, 40, 40);
+    sliders2[30].setBounds(200, 335, 30, 30);
+    sliders2[31].setBounds(230, 335, 30, 30);
+
+    B.setBounds(325, 295, 60, 20);
+
+    B2.setBounds(325, 340, 60, 20);
+
+    sliders2[32].setBounds(395, 285, 40, 40);
+    sliders2[33].setBounds(395, 330, 40, 40);
+
+    sliders2[34].setBounds(440, 290, 30, 30);
+    sliders2[35].setBounds(440, 335, 30, 30);
+
+    sliders2[36].setBounds(675, 180, 50, 50);
+
+    sliders2[37].setBounds(585, 350, 30, 30);
+    sliders2[38].setBounds(535, 340, 45, 45);
+
+    sliders2[39].setBounds(732, 203, 30, 30);
+
+
+    //oscsliders[0][8].setBounds(250, 25, 50, 50);
+
+
 }
+
+void AudioPluginAudioProcessorEditor::timerCallback()
+{
+    repaint(625, 350, 145, 35);
+
+}
+void AudioPluginAudioProcessorEditor::showmenu()
+{
+    juce::PopupMenu menu;
+    menu.addItem(1, "NULL");
+    menu.addItem(2, "CUTOFF");
+    menu.addItem(3, "RESONANCE");
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&B),[this](int d){
+        if (d == 0) return;
+        auto* p = processorRef.STATE.getParameter("slod");
+        float n = p->convertTo0to1((float)(d-1.0f));
+        p->setValueNotifyingHost(n);
+        menunum=(d-1.0f);
+        auto b = B.getBounds();
+        repaint(b.getX(), b.getY(), b.getWidth(), b.getHeight());
+    });
+}
+
+void AudioPluginAudioProcessorEditor::showmenu2()
+{
+    juce::PopupMenu menu;
+    menu.addItem(1, "NULL");
+    menu.addItem(2, "CUTOFF");
+    menu.addItem(3, "RESONANCE");
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&B2),[this](int d){
+        if (d == 0) return;
+        auto* p = processorRef.STATE.getParameter("ulod");
+        float n = p->convertTo0to1((float)(d-1.0f));
+        p->setValueNotifyingHost(n);
+        menunum2=(d-1.0f);
+        auto b = B2.getBounds();
+        repaint(b.getX(), b.getY(), b.getWidth(), b.getHeight());
+    });
+}
+
+

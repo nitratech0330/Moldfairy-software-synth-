@@ -1,3 +1,5 @@
+#pragma one
+
 #define JUCE_FORCE_LEGACY_PARAMETER_AUTOMATION_TYPE 1
 
 #include "JuceHeader.h"
@@ -6,13 +8,562 @@
 
 #include "PluginEditor.h"
 
+#include "3bandseparator.h"
+
 #include <string.h>
 
 #include <algorithm>
 
-#include <cstdint>
+#include <array>
 
+#include <cmath>
+
+juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::paral()
+{
+    juce::AudioProcessorValueTreeState::ParameterLayout fs;
+
+    for (int i=0; i<4; ++i){
+        for (int x=0; x<9; ++x){
+        juce:: String pids (oscpid[i][x]);
+        float min = defval[x].min;
+        float max = defval[x].max;
+        float def = defval[x].def;
+        bool ISint = defval[x].isint;
+        if (ISint){
+            fs.add (std::make_unique<juce::AudioParameterInt> (
+            juce::ParameterID (pids, 1),
+            pids, (int)min, (int)max, (int)def));
+        }else{
+            fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID (pids, 1),
+            pids, min, max, def));
+        }
+        }
+
+    }
+    fs.add (std::make_unique<juce::AudioParameterInt> (
+            juce::ParameterID ("note1", 1),
+            "note1", -11, 11, 0));
+
+    fs.add (std::make_unique<juce::AudioParameterInt> (
+            juce::ParameterID ("note2", 1),
+            "note2", -11, 11, 0));
+
+    fs.add (std::make_unique<juce::AudioParameterInt> (
+            juce::ParameterID ("note3", 1),
+            "note3", -11, 11, 0));
+
+    fs.add (std::make_unique<juce::AudioParameterInt> (
+            juce::ParameterID ("note4", 1),
+            "note4", -11, 11, 0));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("test", 1),
+            "noise", 0.0f, 1.0f, 0.1f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("biv", 1),
+            "biv", 0.0f, 1.0f, 0.1f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("Fc", 1),
+            "fitercut", 0.0f, 1.0f, 0.0f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("Fr", 1),
+            "fiterreso", 0.0f, 1.0f, 0.0f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("FcM", 1),
+            "fiterModCutoff", 0.0f, 1.0f, 0.0f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("FrM", 1),
+            "fiterModreso", 0.0f, 1.0f, 0.0f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("att", 1),
+            "attack", 0.0f, 1.0f, 0.0f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("dec", 1),
+            "decay", 0.0f, 1.0f, 0.2f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("sus", 1),
+            "sustin", 0.0f, 1.0f, 0.2f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("rel", 1),
+            "release", 0.0f, 1.0f, 0.1f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("matt", 1),
+            "modattack", 0.0f, 1.0f, 0.0f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("mdec", 1),
+            "moddecay", 0.0f, 1.0f, 0.2f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("msus", 1),
+            "modsustin", 0.0f, 1.0f, 0.2f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("mrel", 1),
+            "modrelease", 0.0f, 1.0f, 0.1f));
+
+    fs.add (std::make_unique<juce::AudioParameterInt> (
+            juce::ParameterID ("slo", 1),
+            "LFO 1 (synced random) rate", 0, 7, 3));
+
+    fs.add (std::make_unique<juce::AudioParameterChoice> (
+            juce::ParameterID ("slod", 1),
+            "LFO 1 (synced random) dest", juce::StringArray{
+                "none","cutoff","resonance"
+            }, 0));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("ulo", 1),
+            "LFO 2 (unsynced, sine) rate", 0.0f, 1.0f, 0.1f));
+
+    fs.add (std::make_unique<juce::AudioParameterChoice> (
+            juce::ParameterID ("ulod", 1),
+            "LFO 2 (unsynced sine) dest", juce::StringArray{
+                "none","cutoff","resonance"
+            }, 0));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("sldp", 1),
+            "LFO 1 depth", 0.0f, 1.0f, 0.5f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("uldp", 1),
+            "LFO 2 depth", 0.0f, 1.0f, 0.5f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("wsm", 1),
+            "waveshaper mix", 0.0f, 1.0f, 0.0f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("wst", 1),
+            "waveshaper type", 0.0f, 1.0f, 0.0f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("wsg", 1),
+            "waveshaper gain", 0.0f, 1.0f, 0.0f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("cho", 1),
+            "chorus mix", 0.0f, 1.0f, 0.0f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("chd", 1),
+            "chorus depth", 0.0f, 1.0f, 0.5f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("chs", 1),
+            "chorus speed", 0.0f, 1.0f, 0.0f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("chw", 1),
+            "chorus wide", 0.0f, 1.0f, 0.5f));
+
+    fs.add (std::make_unique<juce::AudioParameterInt> (
+            juce::ParameterID ("DeL", 1),
+            "delay L", 0, 15, 0));
+
+    fs.add (std::make_unique<juce::AudioParameterInt> (
+            juce::ParameterID ("DeR", 1),
+            "delay R", 0, 15, 0));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("DeF", 1),
+            "delay feedback", 0.0f, 1.0f, 0.5f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("DeV", 1),
+            "delay volume", 0.0f, 1.0f, 0.0f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("ReF", 1),
+            "reverb feedback", 0.0f, 1.0f, 0.9f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("ReD", 1),
+            "reverb deffusion", 0.0f, 1.0f, 0.7f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("ReV", 1),
+            "reverb volume", 0.0f, 1.0f, 0.0f));
+    
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("ReLc", 1),
+            "reverb lowcut", 0.0f, 1.0f, 0.4f));
+    
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("ReHc", 1),
+            "reverb highcut", 0.0f, 1.0f, 0.3f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("compD", 1),
+            "comp output gain", 0.0f, 1.0f, 0.5f));
+
+    fs.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID ("comp", 1),
+            "comp mix", 0.0f, 1.0f, 0.0f));
+
+    return fs;
+
+}
 //==============================================================================
+//⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜
+OverTheTop::OverTheTop(){}
+
+OverTheTop::~OverTheTop(){}
+
+inline void OverTheTop::reset()
+{ 
+    compbuf=0.0f;
+
+}
+
+inline float OverTheTop::process(float in, float a, float r, float U, float D)
+{
+    a=0.999f+a*0.001f;r=0.999f+r*0.001f;
+
+    float v = std::fabsf(in);
+
+    v = F.process24(v, 0.7f, 2.0f, 1.0f, 0.0f, 0.0f);
+
+    v = ((std::min(compbuf, v))*a)+v*(1.0f-a);
+    compbuf = std::max(v, (compbuf*r));
+
+    float compVol = (1.0f-compbuf);
+    compVol=compVol*compVol*compVol;
+    compbuf=1.0f-compVol;
+
+    float Dg = std::max(0.0f,(compVol-0.3f))*-1.42f;
+    float Ug = std::min(0.0f,(compVol-0.2f))*-5.0f;
+
+    Dg*=D; Ug*=U;
+
+    Dg+=1.0f;Ug+=1.0f;
+
+    float out = in*Dg;
+    out*=Ug;
+
+    return out;
+}
+
+Filterdesing::Filterdesing(){
+    low12=0.0f;band12=0.0f;high12=0.0f;
+    low24=0.0f;band24=0.0f;high24=0.0f;
+    L=0.0f; B=0.0f; H=0.0f;
+}
+Filterdesing::~Filterdesing(){}
+
+inline float Filterdesing::process12(float in, float cut, float reso, float l, float b, float h)
+{
+    cut=cut*cut;
+    cut*=0.96f;
+
+    high12 = in - low12 - reso * band12;
+    band12 = cut * high12 + band12;
+    low12 = low12 + cut * band12;
+
+    float out = ((low12*l)+(band12*b)+(high12*h));
+
+    return out;
+
+}
+
+inline float Filterdesing::process24(float in, float cut, float reso, float l, float b, float h)
+{
+    cut=cut*cut;
+    cut*=0.96f;
+
+    H = in - L - reso * B;
+    B = cut * H + B;
+    L = L + cut * B;
+
+    float out = ((L*l)+(B*b)+(H*h));
+
+    float reso1 = std::max(1.0f, reso);
+
+    high24 = out - low24 - reso1 * band24;
+    band24 = cut * high24 + band24;
+    low24 = low24 + cut * band24;
+
+    out = ((low24*l)+(band24*b)+(high24*h));
+
+    out=std::min(1.0f, (std::max(-1.0f, out)));
+
+    return out;
+}
+
+class AudioPluginAudioProcessor;
+class Synth : public juce::SynthesiserSound
+{
+public:
+    bool appliesToChannel (int /*midiChannel*/) override { return true; } 
+    bool appliesToNote (int /*midiNoteNumber*/) override { return true; }
+};
+
+class Wave : public juce::SynthesiserVoice{
+public: Wave (AudioPluginAudioProcessor& p) : processorRef (p) 
+{
+    Rate = (float)getSampleRate();
+    oneHz = 1.0f / Rate;
+    for (int i=0; i<4; ++i){
+        for (int x=0; x<8; ++x){
+            oscs[i][x]=0;
+            oscdata[i][x]=0;
+        }
+    }
+}
+
+bool canPlaySound (juce::SynthesiserSound* sound) override {return true;}
+
+void startNote (int Notenum, float Velocity, juce::SynthesiserSound*, int) override
+{
+    for (int i=0; i<4; ++i){
+        int note = Notenum + (int)(processorRef.Par[i][1]->load()*12) + (int)(processorRef.pmt[38+i]->load());
+        float fine = 1.0f + (processorRef.Par[i][2]->load()*0.1f);
+        float pha = (oneHz * juce::MidiMessage::getMidiNoteInHertz(note))*fine;
+        uint32_t phs = (uint32_t)(4294967296.0f * pha);
+        oscs[i][0] =phs;oscs[i][1] =phs;
+        float det = 1.0f - processorRef.Par[i][3]->load()*0.01f;
+        for (int x=0; x<6; ++x){
+            oscs[i][(x+2)]=(uint32_t)(oscs[i][(x+1)]*det);
+        }
+    }
+
+    float vfrq = processorRef.pmt[0]->load()*63;
+    int vivx = (int)vfrq;
+    float vlip = vfrq - vivx;
+    float vivrate = (processorRef.modcurv[vivx]*(1.0f-vlip))+processorRef.modcurv[(vivx+1)]*vlip;
+    viv = (uint32_t)(vivrate * 4294967296.0f);
+
+    float ar = (1.0f-processorRef.pmt[3]->load())*63;
+    int atx = (int)ar;
+    float lip = ar - atx;
+    float attackrate = (processorRef.modcurv[atx]*(1.0f-lip))+processorRef.modcurv[(atx+1)]*lip;
+
+    float de = ((1.0f-processorRef.pmt[4]->load()))*63;
+    int dex = (int)de;
+    float dlip = de - dex;
+    float decayrate = (processorRef.modcurv[dex]*(1.0f-dlip))+processorRef.modcurv[(dex+1)]*dlip;
+
+    float ar2 = (1.0f-processorRef.pmt[18]->load())*63;
+    int atx2 = (int)ar2;
+    float lip2 = ar2 - atx2;
+    float attackrate2 = (processorRef.modcurv[atx2]*(1.0f-lip2))+processorRef.modcurv[(atx2+1)]*lip2;
+
+    float de2 = ((1.0f-processorRef.pmt[19]->load()))*63;
+    int dex2 = (int)de2;
+    float dlip2 = de2 - dex2;
+    float decayrate2 = (processorRef.modcurv[dex2]*(1.0f-dlip2))+processorRef.modcurv[(dex+1)]*dlip2;
+
+    atta =1.0f-attackrate;
+    deca =1.0f-decayrate;
+    sust = processorRef.pmt[5]->load();
+    rele = 1.0f;
+    atta2 =1.0f-attackrate2;
+    deca2 =1.0f-decayrate2;
+    sust2 = processorRef.pmt[20]->load();
+    rele2 = 1.0f;
+    env = 1.0f;modenv = 1.0f;
+    attack = 1.0f;Mattack = 1.0f;
+    
+    noteon = true;
+}
+
+void stopNote (float Velocity, bool allowTailOff) override
+{
+    noteon = false;
+    deca = 1.0f;
+    sust = 1.0f;
+    atta = 1.0f;
+    deca2 = 1.0f;
+    sust2 = 1.0f;
+    atta2 = 1.0f;
+    float rr = ((1.0f-processorRef.pmt[6]->load()))*63;
+    int rex = (int)rr;
+    float rlip = rr - rex;
+    float rlerate = (processorRef.modcurv[rex]*(1.0f-rlip))+processorRef.modcurv[(rex+1)]*rlip;
+    rele = 1.0f-rlerate;
+    float rr2 = ((1.0f-processorRef.pmt[21]->load()))*63;
+    int rex2 = (int)rr2;
+    float rlip2 = rr2 - rex2;
+    float rlerate2 = (processorRef.modcurv[rex2]*(1.0f-rlip2))+processorRef.modcurv[(rex2+1)]*rlip2;
+    rele = 1.0f-rlerate;
+    rele2 = 1.0f-rlerate2;
+}
+
+void pitchWheelMoved (int) override {}
+void controllerMoved (int, int) override {}
+
+void renderNextBlock (AudioBuffer<float> &output, int startSample, int numSamples) override
+{
+    auto* chL = output.getWritePointer (0, startSample);
+    auto* chR = output.getNumChannels() > 1 ? output.getWritePointer (1, startSample) : chL;
+
+    int waveforme[4];
+    int voicenum[4][8];
+    float volume[4];
+    float vivra[4];
+    float fm[4];
+    float stereo[4];
+    for (int i=0; i<4; ++i){
+        waveforme[i]=(int)processorRef.Par[i][5]->load();
+        vivra[i]=processorRef.Par[i][8]->load()*0.1f;
+        fm[i]=processorRef.Par[i][6]->load();
+        volume[i]=processorRef.Par[i][0]->load();
+        stereo[i]=processorRef.Par[i][7]->load();
+        int numv =(int)processorRef.Par[i][4]->load();
+        for (int x=0; x<8; ++x){
+        voicenum[i][x]= oscindex[numv][x];
+      }
+    }
+
+    for (int i=0; i<numSamples; ++i){
+
+        attack = attack * atta;
+        env = env * (attack+(deca*(1.0f-attack))); env = env * rele;
+        env = std::max((sust*noteon), env);
+        Env = env*(1.0f-attack);
+
+        Mattack = Mattack * atta2;
+        modenv = modenv * (Mattack+(deca2*(1.0f-Mattack))); modenv = modenv * rele2;
+        modenv = std::max((sust2*noteon), modenv);
+        MODenv = modenv*(1.0f-Mattack);
+
+        float sound[4][2];
+
+        vivdata+=viv;
+        float bivr = wavetable[1][(vivdata >> 26)];
+        float out[4][2];
+        for (int x=0; x<4; ++x){
+            sound[x][0]=0.0f;sound[x][1]=0.0f;
+            float bivamo = 1.0f - (bivr*vivra[x]);
+            int n = (x+5)%4;
+            for (int y=0; y<8; ++y){
+                float fmvalue = 1.0f - wavetable[waveforme[n]][(oscdata[n][0] >> 26)]*fm[x];
+                oscdata[x][y]+=(uint32_t)((oscs[x][y] * fmvalue)*bivamo);
+                sound[x][((y+2)%2)]+=wavetable[waveforme[x]][(oscdata[x][y] >> 26)]*voicenum[x][y];
+                out[x][((y+2)%2)]=0.0f;
+            }
+        }
+        float outmono[4];
+        outmono[0]=0.0f;outmono[1]=0.0f;
+        outmono[2]=0.0f;outmono[3]=0.0f;
+        for (int x=0; x<4; ++x){
+            for (int y=0; y<2; ++y){
+                float gfix = gainfix[voicenum[x][y]];
+                out[x][y] += (sound[x][y]*gfix)*volume[x];
+                outmono[x] += (sound[x][y]*gfix)*volume[x];
+            }
+        }
+        for (int x=0; x<4; ++x){
+            for (int y=0; y<2; ++y){
+                out[x][y] = (out[x][y]*stereo[x])+(outmono[x]*(1.0f-stereo[x]));
+            }
+        }
+        float OuT[2];
+        OuT[0]=out[0][0]+out[1][0]+out[2][0]+out[3][0];
+        OuT[1]=out[0][1]+out[1][1]+out[2][1]+out[3][1];
+
+        chL[i] += (OuT[0]*Env)*0.25f;
+        chR[i] += (OuT[1]*Env)*0.25f;
+    }
+}
+float atta=0.0f;float deca=0.0f;float sust=0.0f;float rele=0.0f;
+float atta2=0.0f;float deca2=0.0f;float sust2=0.0f;float rele2=0.0f;
+
+uint32_t oscs[4][8];
+
+float modenv=0.0f;
+float MODenv=0.0f;
+float env=0.0f;
+float Env=0.0f;
+float Mattack=0.0f;
+float attack=0.0f;
+
+float Rate = 0.0f;
+
+bool noteon =false;
+
+uint32_t oscdata[4][8];
+
+uint32_t viv=0;
+uint32_t vivdata=0;
+
+float oneHz = 0.0f;
+
+    static inline constexpr float wavetable[4][64]{
+    {-1.000000f,-0.968254f,-0.936508f,-0.904762f,-0.873016f,-0.841270f,-0.809524f,-0.777778f,
+	-0.746032f,-0.714286f,-0.682540f,-0.650794f,-0.619048f,-0.587302f,-0.555556f,-0.523810f,
+	-0.492063f,-0.460317f,-0.428571f,-0.396825f,-0.365079f,-0.333333f,-0.301587f,-0.269841f,
+	-0.238095f,-0.206349f,-0.174603f,-0.142857f,-0.111111f,-0.079365f,-0.047619f,-0.015873f,
+	0.015873f,0.047619f,0.079365f,0.111111f,0.142857f,0.174603f,0.206349f,0.238095f,
+	0.269841f,0.301587f,0.333333f,0.365079f,0.396825f,0.428571f,0.460317f,0.492063f,
+	0.523810f,0.555556f,0.587302f,0.619048f,0.650794f,0.682540f,0.714286f,0.746032f,
+	0.777778f,0.809524f,0.841270f,0.873016f,0.904762f,0.936508f,0.968254f,1.000000f},
+
+    {0.125000f,0.028884f,-0.068451f,-0.166165f,-0.263367f,-0.359119f,-0.452434f,-0.542276f,
+	-0.627560f,-0.707153f,-0.779872f,-0.844487f,-0.899717f,-0.944234f,-0.976661f,-0.995572f,
+	-0.999500f,-0.987897f,-0.962047f,-0.923400f,-0.873357f,-0.813272f,-0.744448f,-0.668141f,
+	-0.585558f,-0.497856f,-0.406145f,-0.311485f,-0.214887f,-0.117315f,-0.019683f,0.077145f,
+	0.172351f,0.265168f,0.354876f,0.440806f,0.522334f,0.598890f,0.669948f,0.735034f,
+	0.793720f,0.845629f,0.890432f,0.927848f,0.957647f,0.979644f,0.993706f,0.999748f,
+	0.997733f,0.987673f,0.969630f,0.943712f,0.910079f,0.868938f,0.820544f,0.765202f,
+	0.703266f,0.635137f,0.561268f,0.482157f,0.398353f,0.310454f,0.219104f,0.125000f},
+
+    {-1.000000f,-1.000000f,-1.000000f,-1.000000f,-1.000000f,-1.000000f,-1.000000f,-1.000000f,
+	-1.000000f,-1.000000f,-1.000000f,-1.000000f,-1.000000f,-1.000000f,-1.000000f,-1.000000f,
+	-1.000000f,-1.000000f,-1.000000f,-1.000000f,-1.000000f,-1.000000f,-1.000000f,-1.000000f,
+	-1.000000f,-1.000000f,-1.000000f,-1.000000f,-1.000000f,-1.000000f,-1.000000f,-1.000000f,
+    1.000000f,1.000000f,1.000000f,1.000000f,1.000000f,1.000000f,1.000000f,1.000000f,
+	1.000000f,1.000000f,1.000000f,1.000000f,1.000000f,1.000000f,1.000000f,1.000000f,
+	1.000000f,1.000000f,1.000000f,1.000000f,1.000000f,1.000000f,1.000000f,1.000000f,
+	1.000000f,1.000000f,1.000000f,1.000000f,1.000000f,1.000000f,1.000000f,1.000000f},
+
+    {0.900026f,0.518413f,0.118495f,-0.179627f,-0.400599f,-0.998290f,-0.798041f,-0.191308f,
+	0.516807f,0.938326f,0.972879f,0.749369f,0.435679f,0.139972f,-0.095508f,-0.271748f,
+	-0.431646f,-0.927161f,-0.943061f,-0.697409f,-0.269539f,0.220841f,0.638064f,0.901539f,
+	0.998248f,0.959700f,0.833218f,0.662651f,0.480274f,0.306072f,0.150267f,0.016479f,
+	-0.095687f,-0.188960f,-0.267637f,-0.337786f,-0.408945f,-0.499548f,-0.657126f,-0.999887f,
+	-0.991328f,-0.965734f,-0.921029f,-0.858195f,-0.780355f,-0.691752f,-0.596896f,-0.499977f,
+	-0.404528f,-0.313300f,-0.228267f,-0.150711f,-0.081347f,-0.020450f,0.032027f,0.076359f,
+	0.112969f,0.142381f,0.165177f,0.181989f,0.193497f,0.200445f,0.203699f,0.204398f}
+    };
+
+    static inline const int oscindex[7][8]{
+        {1,1,0,0,0,0,0,0},
+        {0,0,1,1,0,0,0,0},
+        {1,1,1,1,0,0,0,0},
+        {0,0,1,1,1,1,0,0},
+        {1,1,1,1,1,1,0,0},
+        {0,0,1,1,1,1,1,1},
+        {1,1,1,1,1,1,1,1}
+    };
+
+    static inline const float gainfix[]{
+        1.0f,
+        0.9f,
+        0.75f,
+        0.7f,
+        0.65f,
+        0.6f,
+        0.6f
+    };
+
+private:
+
+AudioPluginAudioProcessor& processorRef;
+};
+//⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜
 AudioPluginAudioProcessor::AudioPluginAudioProcessor()
      : AudioProcessor (BusesProperties()
                      #if ! JucePlugin_IsMidiEffect
@@ -22,50 +573,21 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
                        ),
-                       STATES (*this, nullptr, "NITRATECH", paramlayout())
+                       STATE (*this, nullptr, "NITRA", paral())
 {
-    STATES.addParameterListener ("CUTO", this);
-    STATES.addParameterListener ("RESO", this);
-    STATES.addParameterListener ("REMO", this);
-    STATES.addParameterListener ("CUMO", this);
-    STATES.addParameterListener ("ATTA", this);
-    STATES.addParameterListener ("DECA", this);
-    STATES.addParameterListener ("SUST", this);
-    STATES.addParameterListener ("RELE", this);
-    STATES.addParameterListener ("FIAT", this);
-    STATES.addParameterListener ("FIDE", this);
-    STATES.addParameterListener ("FISU", this);
-    STATES.addParameterListener ("FIRE", this);
-    STATES.addParameterListener ("SHAP", this);
-    STATES.addParameterListener ("MOAP", this);
+    oneHzuint = (uint32_t)((1 / getSampleRate())*4294967296.0f);
+    
 }
+
 AudioPluginAudioProcessor::~AudioPluginAudioProcessor()
 {
-    STATES.removeParameterListener ("CUTO", this);
-    STATES.removeParameterListener ("RESO", this);
-    STATES.removeParameterListener ("REMO", this);
-    STATES.removeParameterListener ("CUMO", this);
-    STATES.removeParameterListener ("ATTA", this);
-    STATES.removeParameterListener ("DECA", this);
-    STATES.removeParameterListener ("SUST", this);
-    STATES.removeParameterListener ("RELE", this);
-    STATES.removeParameterListener ("FIAT", this);
-    STATES.removeParameterListener ("FIDE", this);
-    STATES.removeParameterListener ("FISU", this);
-    STATES.removeParameterListener ("FIRE", this);
-    STATES.removeParameterListener ("SHAP", this);
-    STATES.removeParameterListener ("MOAP", this);
-
     const juce::ScopedLock sl (getCallbackLock());
-    Synth.clearVoices();
-    Synth.clearSounds();
-}
-//==============================================================================
-const juce::String AudioPluginAudioProcessor::getName() const
-{
-    return "Moldfairy2";
+    synth.clearSounds();
+    synth.clearVoices();
 }
 
+//==============================================================================
+const juce::String AudioPluginAudioProcessor::getName() const {return "MoldfairyX";}
 bool AudioPluginAudioProcessor::acceptsMidi() const
 {
    #if JucePlugin_WantsMidiInput
@@ -93,42 +615,152 @@ bool AudioPluginAudioProcessor::isMidiEffect() const
    #endif
 }
 
-double AudioPluginAudioProcessor::getTailLengthSeconds() const
-{
-    return 0.0;
-}
+double AudioPluginAudioProcessor::getTailLengthSeconds() const {return 0.0;}
 
-int AudioPluginAudioProcessor::getNumPrograms()
-{
-    return 1;
-}
+int AudioPluginAudioProcessor::getNumPrograms() {return 1;}
 
-int AudioPluginAudioProcessor::getCurrentProgram()
-{
-    return 0;
-}
+int AudioPluginAudioProcessor::getCurrentProgram() {return 0;}
 
-void AudioPluginAudioProcessor::setCurrentProgram (int index)
-{
-    juce::ignoreUnused (index);
-}
+void AudioPluginAudioProcessor::setCurrentProgram (int index) {juce::ignoreUnused (index);}
 
-const juce::String AudioPluginAudioProcessor::getProgramName (int index)
-{
-    juce::ignoreUnused (index);
-    return {};
-}
+const juce::String AudioPluginAudioProcessor::getProgramName (int index) {juce::ignoreUnused (index); return {};}
 
-void AudioPluginAudioProcessor::changeProgramName (int index, const juce::String& newName)
-{
-    juce::ignoreUnused (index, newName);
-}
+void AudioPluginAudioProcessor::changeProgramName (int index, const juce::String& newName) {juce::ignoreUnused (index, newName);}
 
 //==============================================================================
+void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
+{
+    auto zero = [&](auto&& buf){
+        std::fill(std::begin(buf), std::end(buf), 0.0f);
+    };
 
+    for (int i=0; i<4; ++i){
+        for (int x=0; x<9; ++x){
+            juce::String ids (oscpid[i][x]);
+            Par[i][x]=STATE.getRawParameterValue(ids);
+        }
+    }
+
+    oneHzuint = (uint32_t)((1 / getSampleRate())*4294967296.0f);
+
+    onHZF = 1.0f / getSampleRate();
+
+    pmt[0]=STATE.getRawParameterValue("biv");
+    pmt[1]=STATE.getRawParameterValue("Fc");
+    pmt[2]=STATE.getRawParameterValue("FcM");
+
+    pmt[7]=STATE.getRawParameterValue("Fr");
+    pmt[8]=STATE.getRawParameterValue("FrM");
+
+    pmt[3]=STATE.getRawParameterValue("att");
+    pmt[4]=STATE.getRawParameterValue("dec");
+    pmt[5]=STATE.getRawParameterValue("sus");
+    pmt[6]=STATE.getRawParameterValue("rel");
+
+    pmt[9]=STATE.getRawParameterValue("DeF");
+    pmt[10]=STATE.getRawParameterValue("DeV");
+    pmt[11]=STATE.getRawParameterValue("ReF");
+    pmt[12]=STATE.getRawParameterValue("ReD");
+    pmt[13]=STATE.getRawParameterValue("ReV");
+
+    pmt[14]=STATE.getRawParameterValue("DeL");
+    pmt[15]=STATE.getRawParameterValue("DeR");
+
+    pmt[16]=STATE.getRawParameterValue("ReHc");
+    pmt[17]=STATE.getRawParameterValue("ReLc");
+
+    pmt[18]=STATE.getRawParameterValue("matt");
+    pmt[19]=STATE.getRawParameterValue("mdec");
+    pmt[20]=STATE.getRawParameterValue("msus");
+    pmt[21]=STATE.getRawParameterValue("mrel");
+
+    pmt[22]=STATE.getRawParameterValue("cho");
+    pmt[23]=STATE.getRawParameterValue("chs");
+    pmt[24]=STATE.getRawParameterValue("chw");
+    pmt[25]=STATE.getRawParameterValue("chd");
+
+    pmt[26]=STATE.getRawParameterValue("wsm");
+    pmt[27]=STATE.getRawParameterValue("wst");
+    pmt[28]=STATE.getRawParameterValue("wsg");
+
+    pmt[29]=STATE.getRawParameterValue("slo");
+    pmt[30]=STATE.getRawParameterValue("ulo");
+
+    pmt[31]=STATE.getRawParameterValue("sldp");
+    pmt[32]=STATE.getRawParameterValue("uldp");
+    pmt[33]=STATE.getRawParameterValue("slod");
+    pmt[42]=STATE.getRawParameterValue("ulod");
+
+    pmt[34]=STATE.getRawParameterValue("comp");
+    
+    pmt[35]=STATE.getRawParameterValue("test");
+
+    pmt[37]=STATE.getRawParameterValue("compD");
+
+    pmt[38]=STATE.getRawParameterValue("note1");
+     pmt[39]=STATE.getRawParameterValue("note2");
+      pmt[40]=STATE.getRawParameterValue("note3");
+       pmt[41]=STATE.getRawParameterValue("note4");
+
+    for (int i=0;i<8;++i){
+        zero(combsL[i]);
+        zero(combsR[i]);
+        zero(reverbHPFL[i]);
+        zero(reverbHPFR[i]);
+    }
+
+    zero(reverbFil[0]);
+    zero(reverbFil[1]);
+    zero(chorusbuf[0]);
+    zero(chorusbuf[1]);
+
+    for (int i=0;i<6;++i){
+        zero(apfsL[i]);zero(apfsR[i]);
+         zero(apfsL2[i]);zero(apfsR2[i]);
+      
+    }
+
+    zero(delay[0]);zero(delay[1]);
+
+    zero(filterap[0][0]);
+    zero(filterap[1][1]);
+    zero(filterap[0][2]);
+    zero(filterap[1][3]);
+
+    zero(random);
+
+    writeindex =0;
+    writeindex2 =0;
+    writeindex3 =0;
+
+    synth.setCurrentPlaybackSampleRate(sampleRate);
+
+    voice(4);
+
+    Srate=(float)getSampleRate();
+
+    //for(uint_fast16_t r=0;r<128;++r){
+        //random[r]=getrandom()*2.3283064e-10f;
+    //}
+
+    for(uint_fast16_t r=0;r<3;++r){
+        comp[0][r].reset();
+        comp[1][r].reset();
+    }
+}
 
 void AudioPluginAudioProcessor::releaseResources()
 {
+    voice(4);
+    Srate=(float)getSampleRate();
+   
+    for(uint_fast16_t r=0;r<3;++r){
+        comp[0][r].reset();
+        comp[1][r].reset();
+    }
+
+    oneHzuint = (uint32_t)((1 / getSampleRate())*4294967296.0f);
+    onHZF = 1.0f / getSampleRate();
 }
 
 bool AudioPluginAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -137,11 +769,15 @@ bool AudioPluginAudioProcessor::isBusesLayoutSupported (const BusesLayout& layou
     juce::ignoreUnused (layouts);
     return true;
   #else
-    
+    // This is the place where you check if the layout is supported.
+    // In this template code we only support mono or stereo.
+    // Some plugin hosts, such as certain GarageBand versions, will only
+    // load plugins that support stereo bus layouts.
     if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono()
      && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
         return false;
 
+    // This checks if the input layout matches the output layout
    #if ! JucePlugin_IsSynth
     if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
         return false;
@@ -151,12 +787,266 @@ bool AudioPluginAudioProcessor::isBusesLayoutSupported (const BusesLayout& layou
   #endif
 }
 
+void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
+                                              juce::MidiBuffer& midiMessages)
+{
+    juce::ScopedNoDenormals noDenormals;
+    auto totalNumInputChannels  = getTotalNumInputChannels();
+    auto totalNumOutputChannels = getTotalNumOutputChannels();
 
+    float sample = buffer.getNumSamples();
+
+    auto* chL = buffer.getWritePointer (0);
+    auto* chR = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) : chL;
+
+    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
+        buffer.clear (i, 0, sample);
+
+    synth.renderNextBlock(buffer, midiMessages, 0, sample);
+    uint32_t culp=0;
+    if (auto* playHead = getPlayHead()){
+        if (auto posi = playHead->getPosition()){
+            if (posi->getBpm().hasValue()){
+                BPM = static_cast<float>(*(posi->getBpm()));
+            }
+            if (posi->getPpqPosition().hasValue()){
+                uint64_t culpl = static_cast<uint64_t>(*posi->getPpqPosition() * 268435456);
+                culp = static_cast<uint32_t>(culpl);
+            }
+            if (posi->getIsPlaying()){
+                plaing=true;
+            }else{plaing=false;}
+        }
+    }
+
+    uint_fast8_t pqp = (culp>>31);
+    
+    float numdf = std::min(1023.0f,std::max(0.0f, (BPM - 1)));
+    int_fast16_t numd = (int_fast16_t)numdf;
+    float lined = numdf - numd;
+    float delayS = (bpms[numd]*(1.0f-lined))+(bpms[std::min(1023, (numd+1))]*lined);
+    float delayhz = (bpmshz[numd]*(1.0f-lined))+(bpmshz[std::min(1023, (numd+1))]*lined);
+
+    delayphase = (uint32_t)(oneHzuint*delayhz);
+    int delaynumsample = static_cast<int>(delayS * Srate);
+
+    int DeLs = pmt[14]->load()*delaynumsample;
+    int DeRs = pmt[15]->load()*delaynumsample;
+
+    float delayfb = pmt[9]->load();
+    float delayVo = pmt[10]->load();
+    float reverbfb = pmt[11]->load();
+    float reverbDf = pmt[12]->load()*0.5f;
+    float reverbVo = pmt[13]->load();
+
+    float reverbHc = pmt[16]->load()*0.6f;
+    float reverbLc = 0.001f+pmt[17]->load()*0.01f;
+
+    float chorusamo = pmt[22]->load();
+    float chorusspd = pmt[23]->load()*10.0f;
+    float choruswid = pmt[24]->load()*0.5f;
+    float chorusdep = pmt[25]->load()*400.0f;
+    float wsmix = pmt[26]->load();
+    float wstype = pmt[27]->load();
+    float wsgain = pmt[28]->load();
+    uint_fast8_t slfor = 29 - pmt[29]->load();
+    float uslfor = pmt[30]->load();
+
+    float ULDP = pmt[31]->load();
+    float SLDP = pmt[32]->load();
+    uint_fast8_t ULDS = (uint_fast8_t)pmt[33]->load();
+    uint_fast8_t SLDS = (uint_fast8_t)pmt[42]->load();
+   
+    float compmix = pmt[34]->load();
+    float testparam = pmt[35]->load();
+    float compoutg = pmt[37]->load();
+    
+    for (uint_fast16_t i=0; i<sample; ++i){
+        ulfo +=(uint32_t)(delayphase*0.015625f);
+        lfo+=(uint32_t)(delayphase*uslfor);
+        
+        float LFO2 = lfo*2.3283064e-10f;
+        LFO2=std::min(LFO2, (1.0f-LFO2));
+        LFO2=-1.0f+(LFO2*4.0f);
+
+        LFO2*=SLDP;
+
+        float noize = -1.0f+(getrandom()*2.3283064e-10f)*2.0f;
+
+        float wnoize = noize *0.08f;
+
+        uint32_t delx = (writeindex2 - DeLs)&1048575;
+        uint32_t derx = (writeindex2 - DeRs)&1048575;
+        
+        float modENV = 0.0f;
+        float envv = 0.0f;
+        for (int_fast8_t v=0; v<synth.getNumVoices(); ++v){
+            if (auto env = dynamic_cast<Wave*>(synth.getVoice(v))){
+                modENV = std::max(modENV, (env->MODenv));
+                envv = std::max(envv, (env->Env));
+            }
+        }
+        uint_fast32_t liplfo = (uint_fast32_t)((culp*plaing)+(ulfo*(1-plaing)));
+        uint_fast16_t idxlfo = (uint_fast16_t)((liplfo>>slfor)&127);
+        float rfol = ((liplfo&uints[(slfor-1)])*uinttofloat[(slfor-1)]);
+        
+        randomlfo = random[idxlfo]*ULDP;
+
+        random[(idxlfo+1)&127]=noize;
+
+        float LFOmod[3][2];
+
+        LFOmod[0][0]=0.0f;
+        LFOmod[0][1]=0.0f;
+        LFOmod[1][0]=1.0f;
+        LFOmod[1][1]=0.0f;
+        LFOmod[2][0]=0.0f;
+        LFOmod[2][1]=1.0f;
+
+        float reso = pmt[7]->load()+(modENV*(pmt[8]->load()))+((randomlfo*LFOmod[ULDS][1]))+(LFO2*LFOmod[SLDS][1]);
+       float cut = pmt[1]->load()+(modENV*(pmt[2]->load()))+((randomlfo*LFOmod[ULDS][0]))+(LFO2*LFOmod[SLDS][0]);
+       cut = std::max(0.0f, (std::min(cut, 1.0f))); reso = std::max(0.0f,(std::min(reso, 1.0f)));
+
+        reso*=2.0f;
+
+        reso=std::max(reso, cut);
+
+        float noizeOSC =(noize*envv)*testparam;
+
+        chL[i]+=noizeOSC;
+        chR[i]+=noizeOSC;
+
+        float clL=svF[0].process24(chL[i],cut,(2.0f-reso),1.0f,0.0f,0.0f);
+        float clR=svF[1].process24(chR[i],cut,(2.0f-reso),1.0f,0.0f,0.0f);
+
+        clL=wshapeing(clL, wsmix, wsgain, wstype);
+        clR=wshapeing(clR, wsmix, wsgain, wstype);
+
+        chorusdata+= (uint32_t)(oneHzuint*chorusspd);
+      
+        uint32_t chorusdatacos = (uint32_t)(chorusdata+1073741824);
+
+        float chw = chorusdata*2.3283064e-10f;
+        chw=std::min(chw, (1.0f-chw));
+        chw*=2.0f;
+        float chw2 = chorusdatacos*2.3283064e-10f;
+        chw2=std::min(chw2, (1.0f-chw2));
+        chw2*=2.0f;
+
+        float chrL = chorus(chw, clL, chorusdep, chorusbuf[0], writeindex3, 0);
+        float chrR = chorus(chw, clR, chorusdep, chorusbuf[1], writeindex3, 1);
+        float chrLm = chorus(chw2, clL, chorusdep, chorusbuf[0], writeindex3, 0);
+        float chrRm = chorus(chw2, clR, chorusdep, chorusbuf[1], writeindex3, 0);
+
+        float chorsampL =((chrLm*(1.0f-choruswid))+chrL*choruswid);
+        float chorsampR =((chrRm*(1.0f-choruswid))+chrR*choruswid);
+
+        chorsampL=chorsampL+(wnoize*(std::fabsf(chorsampL)));
+        chorsampR=chorsampR+(wnoize*(std::fabsf(chorsampR)));
+
+        clL+=chorsampL*chorusamo;
+        clR+=chorsampR*chorusamo;
+        
+        float Ldelay = delay[0][delx];
+        float Rdelay = delay[1][derx];
+
+        delay[0][writeindex2]=clL+(Ldelay*delayfb);
+        delay[1][writeindex2]=clR+(Rdelay*delayfb);
+
+        chL[i]=clL+(Ldelay*delayVo);
+        chR[i]=clR+(Rdelay*delayVo);
+
+        uint_fast16_t apf[2][6];
+        for (int_fast8_t y=0;y<6;++y){
+            apf[0][y]=(uint_fast16_t)(writeindex3 - apfindex[0][y])&1023;
+            apf[1][y]=(uint_fast16_t)(writeindex3 - apfindex[1][y])&1023;
+        }
+
+        float apfdLv[6];float apfdRv[6];
+        apfdLv[0] = APF(chL[i], reverbDf, apfsL[0], apfsL2[0], writeindex3, apf[0][0]);
+        apfdRv[0] = APF(chR[i], reverbDf, apfsR[0], apfsR2[0], writeindex3, apf[1][0]);
+
+        for (int_fast8_t z=0;z<5;++z){
+            int_fast8_t n = z+1;
+            apfdLv[n] = APF(apfdLv[z], reverbDf, apfsL[n], apfsL2[n], writeindex3, apf[0][n]);
+            apfdRv[n] = APF(apfdRv[z], reverbDf, apfsR[n], apfsR2[n], writeindex3, apf[1][n]);
+        }
+
+        float combsval[16];
+        for (int_fast8_t a=0; a<8; ++a){
+            uint_fast16_t idxc1 = (writeindex - combindex[0][a])&4095;
+            uint_fast16_t idxc2 = (writeindex - combindex[1][a])&4095;
+            float foutL = oneHPF(oneIIR(combsL[a][idxc1], reverbFil[0][a], reverbHc), reverbHPFL[a], reverbLc);
+            float foutR = oneHPF(oneIIR(combsR[a][idxc2], reverbFil[1][a], reverbHc), reverbHPFR[a], reverbLc);
+            combsval[a] = foutL;
+            combsval[(15-a)] = foutR;
+        }
+
+        Hadamard16(combsval);
+        for (int_fast8_t b=0; b<8; ++b){
+        combsL[b][writeindex]=(apfdLv[5]*(1.0f-(reverbfb*0.4f)))+combsval[(15-b)]*reverbfb;
+        combsR[b][writeindex]=(apfdRv[5]*(1.0f-(reverbfb*0.4f)))+combsval[b]*reverbfb;
+        }
+
+        float fdnoutL=0.0f;float fdnoutR=0.0f;
+        for (int_fast8_t b=0; b<16; b+=2){
+            fdnoutL+=combsval[b];
+            fdnoutR+=combsval[(b+1)];
+        }
+        
+        float culL = (chL[i]*(1.0f-reverbVo))+(fdnoutL*0.75f)*reverbVo;
+        float culR = (chR[i]*(1.0f-reverbVo))+(fdnoutR*0.75f)*reverbVo;
+
+        float trband[2][4];
+
+        trband[0][0] = band[0].process3band(culL, 0);
+        trband[0][1] = band[0].midband;
+        trband[0][2] = band[0].highband;
+
+        trband[1][0] = band[1].process3band(culR, 0);
+        trband[1][1] = band[1].midband;
+        trband[1][2] = band[1].highband;
+
+        float drysigL = (trband[0][0]+trband[0][1]+trband[0][2]);
+        float drysigR = (trband[1][0]+trband[1][1]+trband[1][2]);
+
+            float gaininp[3];
+            gaininp[0] = 1.71f;
+            gaininp[1] = 1.0f;
+            gaininp[2] = 1.87f;
+
+        float outcompL=0.0f;float outcompR=0.0f;
+
+            for (uint_fast8_t o=0;o<3;++o){
+                outcompL+=comp[0][o].process((trband[0][o]*gaininp[o]), compprams[o][0],compprams[o][1],compprams[o][2],compprams[o][3]);
+                outcompR+=comp[1][o].process((trband[1][o]*gaininp[o]), compprams[o][0],compprams[o][1],compprams[o][2],compprams[o][3]);
+            }
+
+            outcompL*=compoutg;outcompR*=compoutg;
+
+            bool compbool = static_cast<bool>(compmix);
+
+            drysigL = (culL*(1.0f-compbool))+drysigL*compbool;
+            drysigR = (culR*(1.0f-compbool))+drysigR*compbool;
+
+            chL[i]=(drysigL*(1.0f-compmix))+(outcompL*compmix);
+            chR[i]=(drysigR*(1.0f-compmix))+(outcompR*compmix);
+
+            Lvol=(Lvol*0.99f)+std::fabsf(chL[i])*0.01f;
+            Rvol=(Rvol*0.99f)+std::fabsf(chR[i])*0.01f;
+
+        firidx=(firidx+1)&15;
+        writeindex = (writeindex+1)&4095;
+        writeindex2 = (writeindex2+1)&1048575;
+        writeindex3 = (writeindex3+1)&1023;
+    }
+    midiMessages.clear();
+}
 
 //==============================================================================
 bool AudioPluginAudioProcessor::hasEditor() const
 {
-    return true; // (change this to false if you choose to not supply an editor)
+    return true;
 }
 
 juce::AudioProcessorEditor* AudioPluginAudioProcessor::createEditor()
@@ -164,11 +1054,11 @@ juce::AudioProcessorEditor* AudioPluginAudioProcessor::createEditor()
     return new AudioPluginAudioProcessorEditor (*this);
 }
 
+//==============================================================================
 void AudioPluginAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    //juce::ignoreUnused (destData);
-    juce::XmlElement xml ("states");
-    auto State = STATES.copyState();
+    juce::XmlElement xml ("mrfd");
+    auto State = STATE.copyState();
     std::unique_ptr<juce::XmlElement>apvtsXml (State.createXml());
     xml.addChildElement (apvtsXml.release());
     copyXmlToBinary (xml, destData);
@@ -176,1361 +1066,126 @@ void AudioPluginAudioProcessor::getStateInformation (juce::MemoryBlock& destData
 
 void AudioPluginAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    //juce::ignoreUnused (data, sizeInBytes);
     std::unique_ptr<juce::XmlElement> xmlStates (getXmlFromBinary (data, sizeInBytes));
     if (xmlStates != nullptr){
-        if (xmlStates->hasTagName("states")){
-            auto apS = xmlStates->getChildByName(STATES.state.getType().toString());
+        if (xmlStates->hasTagName("mrfd")){
+            auto apS = xmlStates->getChildByName(STATE.state.getType().toString());
             if (apS != nullptr){
-                STATES.replaceState(juce::ValueTree::fromXml(*apS));
+                STATE.replaceState(juce::ValueTree::fromXml(*apS));
                 updateHostDisplay();
             }
         }
     }
 }
 
+//==============================================================================
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new AudioPluginAudioProcessor();
 }
 
-juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::paramlayout()
-{
-    juce::AudioProcessorValueTreeState::ParameterLayout leyout;
-
-    
-
-    juce::StringArray SAw;
-    SAw.add("SuperSaw off");
-    SAw.add("SuperSaw 0n");
-
-    juce::StringArray numv;
-    numv.add ("single");
-    numv.add ("2");
-    numv.add ("3");
-    numv.add ("4");
-    numv.add ("5");
-    numv.add ("6");
-    numv.add ("SuperSaw");
-
-    juce::StringArray Waveforms;
-    Waveforms.add ("SAW");
-    Waveforms.add ("SINE");
-    Waveforms.add ("FMwave");
-    Waveforms.add ("RECTANGLE");
-
-    juce::StringArray Ftype;
-    Ftype.add("Lowpass");
-    Ftype.add("Highpass");
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("CUTO", 1),
-        "Cutoff", 0.0f, 1.0f, 0.99f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("RESO", 1),
-        "Emphasis", 0.0f, 1.0f, 0.0f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("REMO", 1),
-        "Emphasis MOD", 0.0f, 1.0f, 0.0f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("CUMO", 1),
-        "Cutoff MOD", 0.0f, 1.0f, 0.0f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("ATTA", 1),
-        "Attack", 0.0f, 0.4f, 0.0f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("DECA", 1),
-        "Decay", 0.0f, 0.4f, 0.2f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("SUST", 1),
-        "Sustin", 0.001f, 1.0f, 0.2f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("RELE", 1),
-        "Release", 0.0f, 2.0f, 0.1f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("FIAT", 1),
-        "Filter Attack", 0.0f, 0.4f, 0.0f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("FIDE", 1),
-        "Filter Decay", 0.0f, 0.4f, 0.2f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("FISU", 1),
-        "Filter Sustin", 0.001f, 1.0f, 0.2f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("FIRE", 1),
-        "Filter Release", 0.0f, 2.0f, 0.1f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("FINE1", 1),
-        "OSC 1 Fine Tune", -0.09f, 0.09f, 0.0f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("FINE2", 1),
-        "OSC 2 Fine Tune", -0.09f, 0.09f, 0.0f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("FINE3", 1),
-        "OSC 3 Fine Tune", -0.09f, 0.09f, 0.0f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("FINE4", 1),
-        "OSC 4 Fine Tune", -0.09f, 0.09f, 0.0f));
-
-    leyout.add (std::make_unique<juce::AudioParameterInt> (
-        juce::ParameterID ("TONE1", 1),
-        "OSC 1 Note", -11, 11, 0));
-    
-    leyout.add (std::make_unique<juce::AudioParameterInt> (
-        juce::ParameterID ("TONE2", 1),
-        "OSC 2 Note", -11, 11, 0));
-
-    leyout.add (std::make_unique<juce::AudioParameterInt> (
-        juce::ParameterID ("TONE3", 1),
-        "OSC 3 Note", -11, 11, 0));
-
-    leyout.add (std::make_unique<juce::AudioParameterInt> (
-        juce::ParameterID ("TONE4", 1),
-        "OSC 4 Note", -11, 11, 0));
-
-    leyout.add (std::make_unique<juce::AudioParameterInt> (
-        juce::ParameterID ("OCT1", 1),
-        "OSC 1 Octave", -4, 4, 0));
-    
-    leyout.add (std::make_unique<juce::AudioParameterInt> (
-        juce::ParameterID ("OCT2", 1),
-        "OSC 2 Octave", -4, 4, 0));
-
-    leyout.add (std::make_unique<juce::AudioParameterInt> (
-        juce::ParameterID ("OCT3", 1),
-        "OSC 3 Octave", -4, 4, 0));
-
-    leyout.add (std::make_unique<juce::AudioParameterInt> (
-        juce::ParameterID ("OCT4", 1),
-        "OSC 4 Octave", -4, 4, 0));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("VOL1", 1),
-        "OSC 1 Volume", 0.0f, 1.0f, 0.6f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("VOL2", 1),
-        "OSC 2 Volume", 0.0f, 1.0f, 0.0f));
-    
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("VOL3", 1),
-        "OSC 3 Volume", 0.0f, 1.0f, 0.0f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("VOL4", 1),
-        "OSC 4 Volume", 0.0f, 1.0f, 0.0f));
-
-    leyout.add (std::make_unique<juce::AudioParameterInt> (
-        juce::ParameterID ("SHAP", 1),
-        "ENV shape", 0, 23, 15));
-
-    leyout.add (std::make_unique<juce::AudioParameterInt> (
-        juce::ParameterID ("MOAP", 1),
-        "MOD ENV shape", 0, 23, 15));
-
-    leyout.add (std::make_unique<juce::AudioParameterInt> (
-        juce::ParameterID ("OS1D", 1),
-        "OSC 1 Detune", 0, 31, 3));
-
-    leyout.add (std::make_unique<juce::AudioParameterInt> (
-        juce::ParameterID ("OS2D", 1),
-        "OSC 2 Detune", 0, 31, 3));
-
-    leyout.add (std::make_unique<juce::AudioParameterInt> (
-        juce::ParameterID ("OS3D", 1),
-        "OSC 3 Detune", 0, 31, 3));
-
-    leyout.add (std::make_unique<juce::AudioParameterInt> (
-        juce::ParameterID ("OS4D", 1),
-        "OSC 4 Detune", 0, 31, 3));
-
-    leyout.add (std::make_unique<juce::AudioParameterChoice> (
-        juce::ParameterID ("OS1N", 1),
-        "OSC 1 Voice", numv, 0));
-
-    leyout.add (std::make_unique<juce::AudioParameterChoice> (
-        juce::ParameterID ("OS2N", 1),
-        "OSC 2 Voice", numv, 0));
-
-    leyout.add (std::make_unique<juce::AudioParameterChoice> (
-        juce::ParameterID ("OS3N", 1),
-        "OSC 3 Voice", numv, 0));
-
-    leyout.add (std::make_unique<juce::AudioParameterChoice> (
-        juce::ParameterID ("OS4N", 1),
-        "OSC 4 Voice", numv, 0));
-
-    leyout.add (std::make_unique<juce::AudioParameterChoice> (
-        juce::ParameterID ("WAVE1", 1),
-        "OSC1 Waveform", Waveforms, 0));
-
-    leyout.add (std::make_unique<juce::AudioParameterChoice> (
-        juce::ParameterID ("WAVE2", 1),
-        "OSC2 Waveform", Waveforms, 0));
-
-    leyout.add (std::make_unique<juce::AudioParameterChoice> (
-        juce::ParameterID ("WAVE3", 1),
-        "OSC3 Waveform", Waveforms, 0));
-
-    leyout.add (std::make_unique<juce::AudioParameterChoice> (
-        juce::ParameterID ("WAVE4", 1),
-        "OSC4 Waveform", Waveforms, 0));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("VIV1", 1),
-        "OSC 1 Vibrato", 0.0f, 1.0f, 0.0f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("VIS1", 1),
-        "Vibrato Speed", 0.0f, 100.0f, 0.0f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("VIV2", 1),
-        "OSC 2 Vibrato", 0.0f, 1.0f, 0.0f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("VIV3", 1),
-        "OSC 3 Vibrato", 0.0f, 1.0f, 0.0f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("VIV4", 1),
-        "OSC 4 Vibrato", 0.0f, 1.0f, 0.0f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("FM1", 1),
-        "OSC 1 FM from OSC 2", 0.0f, 1.0f, 0.0f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("FM2", 1),
-        "OSC 2 FM from OSC 3", 0.0f, 1.0f, 0.0f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("FM3", 1),
-        "OSC 3 FM from OSC 4", 0.0f, 1.0f, 0.0f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("FM4", 1),
-        "OSC 4 FM from OSC 1", 0.0f, 1.0f, 0.0f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("DELA", 1),
-        "Delay Volume", 0.0f, 1.0f, 0.0f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("DELAF", 1),
-        "Delay Feedback", 0.0f, 1.0f, 0.4f));
-
-    leyout.add (std::make_unique<juce::AudioParameterInt> (
-        juce::ParameterID ("DELaL", 1),
-        "Delay Time L", 1, 16, 3));
-
-    leyout.add (std::make_unique<juce::AudioParameterInt> (
-        juce::ParameterID ("DELaR", 1),
-        "Delay Time R", 1, 16, 6));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("DELAFC", 1),
-        "Delay Filter Cutoff", 0.0f, 1.0f, 0.2f));
-
-    leyout.add (std::make_unique<juce::AudioParameterChoice> (
-        juce::ParameterID ("DELAFT", 1),
-        "Delay Filter Type", Ftype, 1));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("REVEFC", 1),
-        "Reverb Feedback", 0.0f, 0.98f, 0.8f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("REVEV", 1),
-        "Reverb Volume", 0.0f, 1.0f, 0.0f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("REVEH", 1),
-        "Reverb High Cutoff", 0.0f, 1.0f, 0.8f));
-
-    leyout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID ("REVEL", 1),
-        "Reverb Low Cutoff", 0.0f, 0.05f, 0.01f));
-
-    return leyout;
-}
-
-//🎹⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝🎹//
-class AudioPluginAudioProcessor;
-class synth : public juce::SynthesiserSound
-{
-public:
-    bool appliesToChannel (int /*midiChannel*/) override { return true; } 
-    bool appliesToNote (int /*midiNoteNumber*/) override { return true; }
-};
-
-class Wave : public juce::SynthesiserVoice
-{
-
-public: Wave (AudioPluginAudioProcessor& p) : Moldfairy2 (p) 
-{
-
-    for (int i=0; i<8; ++i){
-        OSCdata1[i]=0;
-        OSCdata2[i]=0;
-        OSCdata3[i]=0;
-        OSCdata4[i]=0;
-
-        OSC1i[i]=0;
-        OSC2i[i]=0;
-        OSC3i[i]=0;
-        OSC4i[i]=0;
-
-        OSC1U[i]=0.0f;
-        OSC2U[i]=0.0f;
-        OSC3U[i]=0.0f;
-        OSC4U[i]=0.0f;
-    }
-
-    for (int i=0; i<4; ++i){
-    voicegain[i]=0;
-    }
-
-    auto attack = Moldfairy2.atta->load();
-    auto sustin = Moldfairy2.sust->load();
-    auto decay = Moldfairy2.deca->load();
-    auto release = Moldfairy2.rele->load();
-
-    juce::ADSR::Parameters para1;
-    para1.attack = attack;
-    para1.decay = decay;
-    para1.sustain = sustin;
-    para1.release = release;
-    ENV.setParameters (para1);
-
-    auto Fattack = Moldfairy2.Ftta->load();
-    auto Fsustin = Moldfairy2.Fust->load();
-    auto Fdecay = Moldfairy2.Feca->load();
-    auto Frelease = Moldfairy2.Fele->load();
-
-    juce::ADSR::Parameters para2;
-    para2.attack = Fattack;
-    para2.decay = Fdecay;
-    para2.sustain = Fsustin;
-    para2.release = Frelease;
-    FENV.setParameters (para2);
-}
-
-void cullentENV (float A, float D, float S, float R, float FA, float FD, float FS, float FR)
-{
-    juce::ADSR::Parameters para1;
-    para1.attack = A;
-    para1.decay = D;
-    para1.sustain = S;
-    para1.release = R;
-    ENV.setParameters(para1);
-
-    juce::ADSR::Parameters para2;
-    para2.attack = FA;
-    para2.decay = FD;
-    para2.sustain = FS;
-    para2.release = FR;
-    FENV.setParameters(para2);
-}
-
-bool canPlaySound (juce::SynthesiserSound* sound) override
-{ 
-    return true; 
-}
-
-void startNote (int Notenum, float Velocity, juce::SynthesiserSound*, int) override
-{
-    
-    float Rate = (float)getSampleRate();
-
-        int Note1 = static_cast<int>(Moldfairy2.tone1->load());
-        int Oct1 = 12 * static_cast<int>(Moldfairy2.oct1->load());
-        float Frq1 = juce::MidiMessage::getMidiNoteInHertz(Notenum + Note1 + Oct1);
-        float FIne1 = Moldfairy2.fine1->load();
-        float frq1 = Frq1 * (1 + FIne1);
-        PH1 = frq1 / Rate;
-    
-    
-        int Note2 = static_cast<int>(Moldfairy2.tone2->load());
-        int Oct2 = 12 * static_cast<int>(Moldfairy2.oct2->load());
-        float Frq2 = juce::MidiMessage::getMidiNoteInHertz(Notenum + Note2 + Oct2);
-        float FIne2 = Moldfairy2.fine2->load();
-        float frq2 = Frq2 * (1 + FIne2);
-        PH2 = frq2 / Rate;
-    
-
-        int Note3 = static_cast<int>(Moldfairy2.tone3->load());
-        int Oct3 = 12 * static_cast<int>(Moldfairy2.oct3->load());
-        float Frq3 = juce::MidiMessage::getMidiNoteInHertz(Notenum + Note3 + Oct3);
-        float FIne3 = Moldfairy2.fine3->load();
-        float frq3 = Frq3 * (1 + FIne3);
-        PH3 = frq3 / Rate;
-  
-    
-        int Note4 = static_cast<int>(Moldfairy2.tone4->load());
-        int Oct4 = 12 * static_cast<int>(Moldfairy2.oct4->load());
-        float Frq4 = juce::MidiMessage::getMidiNoteInHertz(Notenum + Note4 + Oct4);
-        float FIne4 = Moldfairy2.fine4->load();
-        float frq4 = Frq4 * (1 + FIne4);
-        PH4 = frq4 / Rate;
-    
-    
-        float vivfrq = Moldfairy2.OSCVIS->load();
-        vivla = (uint32_t)((vivfrq / Rate)*4294967296.0f);
-
-    Moldfairy2.envshap = (int)24 * (static_cast<int>(Moldfairy2.shapetable->load()));
-   
-    Moldfairy2.Modenvshap = (int)24 * (static_cast<int>(Moldfairy2.Mshapetable->load()));
-
-    int numV = static_cast<int>(Moldfairy2.numV->load());
-    int numV2 = static_cast<int>(Moldfairy2.numV2->load());
-    int numV3 = static_cast<int>(Moldfairy2.numV3->load());
-    int numV4 = static_cast<int>(Moldfairy2.numV4->load());
-
-    voicegain[0]=numV;voicegain[1]=numV2;
-    voicegain[2]=numV3;voicegain[3]=numV4;
-
-    numvoice = (int)(8 * numV);
-    numvoice2 = (int)(8 * numV2);
-    numvoice3 = (int)(8 * numV3);
-    numvoice4 = (int)(8 * numV4);
-    
-    int Dtune = static_cast<int>(Moldfairy2.dtun->load());
-    int Dtune2 = static_cast<int>(Moldfairy2.dtun2->load());
-    int Dtune3 = static_cast<int>(Moldfairy2.dtun3->load());
-    int Dtune4 = static_cast<int>(Moldfairy2.dtun4->load());
-
-    OSC1U[0]=PH1;OSC1U[1]=PH1;
-    OSC2U[0]=PH2;OSC2U[1]=PH2;
-    OSC3U[0]=PH3;OSC3U[1]=PH3;
-    OSC4U[0]=PH4;OSC4U[1]=PH4;
-
-    for (int i=0; i<6; ++i){
-        Damo = Moldfairy2.DetunAmo[Dtune];
-        Damo2 = Moldfairy2.DetunAmo[Dtune2];
-        Damo3 = Moldfairy2.DetunAmo[Dtune3];
-        Damo4 = Moldfairy2.DetunAmo[Dtune4];
-        OSC1U[2+i]=OSC1U[1+i]*Damo;
-        OSC2U[2+i]=OSC2U[1+i]*Damo2;
-        OSC3U[2+i]=OSC3U[1+i]*Damo3;
-        OSC4U[2+i]=OSC4U[1+i]*Damo4;
-    }
-    for (int i=0; i<8; ++i){
-        OSC1i[i] = (uint32_t)(OSC1U[i]*4294967296.0f);
-        OSC2i[i] = (uint32_t)(OSC2U[i]*4294967296.0f);
-        OSC3i[i] = (uint32_t)(OSC3U[i]*4294967296.0f);
-        OSC4i[i] = (uint32_t)(OSC4U[i]*4294967296.0f);
-    }
-   
-    ENV.noteOn();
-    FENV.noteOn();
-}
-
-void stopNote (float Velocity, bool allowTailOff) override
-{
-    ENV.noteOff();
-    FENV.noteOff();
-    if(!allowTailOff)clearCurrentNote();
-}
-
-void pitchWheelMoved (int) override 
-{
-    
-}
-void controllerMoved (int, int) override 
-{
-
-}
-
-void renderNextBlock (AudioBuffer<float> &output, int startSample, int numSamples) override
-{
-    float volme1 = Moldfairy2.vol1->load();
-    float volme2 = Moldfairy2.vol2->load();
-    float volme3 = Moldfairy2.vol3->load();
-    float volme4 = Moldfairy2.vol4->load();
-
-    osc1wave = (int)(32 * static_cast<int>(Moldfairy2.OSC1WAVE->load()));
-    osc2wave = (int)(32 * static_cast<int>(Moldfairy2.OSC2WAVE->load()));
-    osc3wave = (int)(32 * static_cast<int>(Moldfairy2.OSC3WAVE->load()));
-    osc4wave = (int)(32 * static_cast<int>(Moldfairy2.OSC4WAVE->load()));
-
-    float vivamo1 = Moldfairy2.OSC1VIV->load() * 0.1f;
-    float vivamo2 = Moldfairy2.OSC2VIV->load() * 0.1f;
-    float vivamo3 = Moldfairy2.OSC3VIV->load() * 0.1f;
-    float vivamo4 = Moldfairy2.OSC4VIV->load() * 0.1f;
-
-    float FMamo1 = Moldfairy2.FMM1->load();
-    float FMamo2 = Moldfairy2.FMM2->load();
-    float FMamo3 = Moldfairy2.FMM3->load();
-    float FMamo4 = Moldfairy2.FMM4->load();
-
-    
-       
-    auto* chL = output.getWritePointer (0, startSample);
-    auto* chR = output.getNumChannels() > 1 ? output.getWritePointer (1, startSample) : chL;
-
-    for (int i=0; i<numSamples; ++i){
-        float ENVs = ENV.getNextSample(); 
-        float VolENV = Moldfairy2.ENVtypes[((int)(ENVs*23))+Moldfairy2.envshap];
-        float Menv = FENV.getNextSample();
-        modENV = Moldfairy2.ENVtypes[((int)(Menv*23))+Moldfairy2.Modenvshap];
-        
-        vivData += vivla;
-        float viv = Moldfairy2.WaveTable[(vivData >> 27)+32];
-
-        float out1[2]; float out2[2];
-        float out3[2]; float out4[2];
-
-        for (int y=0; y<2; ++y){
-            out1[y]=0.0f;
-            out2[y]=0.0f;
-            out3[y]=0.0f;
-            out4[y]=0.0f;
-        }
-
-        for (int x=0;x<8;++x){
-
-            float viv4= 1.0f-(viv*vivamo4);
-            float fm4= 1.0f-(Moldfairy2.WaveTable[(OSCdata1[x] >> 27)+osc1wave]*FMamo4);
-            uint32_t ph4 = uint32_t((OSC4i[x] * viv4)*fm4);
-            OSCdata4[x]+=ph4;
-            out4[(x+2)%2]+=Moldfairy2.WaveTable[((OSCdata4[x] >> 27))+osc4wave]*oscindex[x+numvoice4];
-         
-            float viv3= 1.0f-(viv*vivamo3);
-            float fm3= 1.0f-(Moldfairy2.WaveTable[(OSCdata4[x] >> 27)+osc4wave]*FMamo3);
-            uint32_t ph3 = uint32_t((OSC3i[x] * viv3)*fm3);
-            OSCdata3[x]+=ph3;
-            out3[(x+2)%2]+=Moldfairy2.WaveTable[(OSCdata3[x] >> 27)+osc3wave]*oscindex[x+numvoice3];
-
-            float viv2= 1.0f-(viv*vivamo2);
-            float fm2= 1.0f-(Moldfairy2.WaveTable[(OSCdata3[x] >> 27)+osc3wave]*FMamo2);
-            uint32_t ph2 = uint32_t((OSC2i[x] * viv2)*fm2);
-            OSCdata2[x]+=ph2;
-            out2[(x+2)%2]+=Moldfairy2.WaveTable[(OSCdata2[x] >> 27)+osc2wave]*oscindex[x+numvoice2];
-
-            float viv1= 1.0f-(viv*vivamo1);
-            float fm1= 1.0f-(Moldfairy2.WaveTable[(OSCdata2[x] >> 27)+osc2wave]*FMamo1);
-            uint32_t ph1 = uint32_t((OSC1i[x] * viv1)*fm1);
-            OSCdata1[x]+=ph1;
-            out1[(x+2)%2]+=Moldfairy2.WaveTable[(OSCdata1[x] >> 27)+osc1wave]*oscindex[x+numvoice];
-
-        }
-
-        float waveout[2];waveout[0]=0.0f;waveout[1]=0.0f;
-
-        for (int z=0;z<2;++z){
-            waveout[z]=((out1[z]*gainfix[voicegain[0]]*volme1)+(out2[z]*gainfix[voicegain[1]]*volme2)+(out3[z]*gainfix[voicegain[2]]*volme3)+(out4[z]*gainfix[voicegain[3]]*volme4))*VolENV;
-        }
-
-        chL[i] += waveout[0]*0.5f;
-        chR[i] += waveout[1]*0.5f;
-
-    }
-
-}   
-
-    int osc1wave =0;
-    int osc2wave =0;
-    int osc3wave =0;
-    int osc4wave =0;
-
-    uint32_t vivla = 0;
-    uint32_t vivData = 0;
-
-    float modENV = 0.0f;
-
-    int numvoice =0;
-    int numvoice2 =0;
-    int numvoice3 =0;
-    int numvoice4 =0;
-
-    int voicegain[4];
-
-    float Damo = 0.0f;
-    float Damo2 = 0.0f;
-    float Damo3 = 0.0f;
-    float Damo4 = 0.0f;
-
-    float PH1 = 0.0f;
-    float PH2 = 0.0f;
-    float PH3 = 0.0f;
-    float PH4 = 0.0f;
-
-    float PHW = 0.0f;
-
-    uint32_t OSCdata1[8];
-    uint32_t OSCdata2[8];
-    uint32_t OSCdata3[8];
-    uint32_t OSCdata4[8];
-
-    uint32_t OSC1i[8];
-    uint32_t OSC2i[8];
-    uint32_t OSC3i[8];
-    uint32_t OSC4i[8];
-
-    float OSC1U[8];
-    float OSC2U[8];
-    float OSC3U[8];
-    float OSC4U[8];
-
-    static inline const int oscindex[]{
-    1,1,0,0,0,0,0,0,
-    0,0,1,1,0,0,0,0,
-    1,1,1,1,0,0,0,0,
-    0,0,1,1,1,1,0,0,
-    1,1,1,1,1,1,0,0,
-    0,0,1,1,1,1,1,1,
-    1,1,1,1,1,1,1,1
-    };
-
-    static inline const float gainfix[]{
-        1.0f,
-        0.9f,
-        0.75f,
-        0.7f,
-        0.65f,
-        0.6f,
-        0.6f
-    };
-
-private:
-
-    juce::ADSR ENV;
-
-    juce::ADSR FENV;
-
-AudioPluginAudioProcessor& Moldfairy2; 
-};
-//🎹⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝⏜⏝🎹//
-
-
-void AudioPluginAudioProcessor::parameterChanged (const juce::String& parameterID, float newValue)
-{
-    float sample = getSampleRate();
-    if (parameterID == "ATTA" || parameterID == "SUST" || parameterID == "DECA" || parameterID == "RELE" || parameterID == "FIAT" || parameterID == "FISU" || parameterID == "FIDE" || parameterID == "FILE")
-    {
-        auto attack = atta->load();
-        auto sustin = sust->load();
-        auto decay = deca->load();
-        auto release = rele->load();
-
-        auto Fattack = Ftta->load();
-        auto Fsustin = Feca->load();
-        auto Fdecay = Fust->load();
-        auto Frelease = Fele->load();
-    
-        for (int i = 0; i < Synth.getNumVoices(); ++i){
-            if (auto* Voice = dynamic_cast<Wave*>(Synth.getVoice(i))){ 
-            Voice->cullentENV(attack, decay, sustin, release, Fattack, Fdecay, Fsustin, Frelease);
-    }}}
-
-    if (parameterID == "SHAP"){
-        envshap = ((int)24 * (int)newValue);
-    }
-
-    if (parameterID == "MOAP"){
-        Modenvshap = ((int)24 * (int)newValue);
-    }
-}
-
-void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
-{
-    //juce::ignoreUnused (sampleRate, samplesPerBlock);
-    shapetable = STATES.getRawParameterValue("SHAP");
-    Mshapetable = STATES.getRawParameterValue("MOAP");
-
-    culcut = STATES.getRawParameterValue("CUTO");
-    culres = STATES.getRawParameterValue("RESO");
-    culcmo = STATES.getRawParameterValue("CUMO");
-    culrmo = STATES.getRawParameterValue("REMO");
-
-    tone1 = STATES.getRawParameterValue("TONE1");
-    tone2 = STATES.getRawParameterValue("TONE2");
-    tone3 = STATES.getRawParameterValue("TONE3");
-    tone4= STATES.getRawParameterValue("TONE4");
-
-    oct1 = STATES.getRawParameterValue("OCT1");
-    oct2 = STATES.getRawParameterValue("OCT2");
-    oct3 = STATES.getRawParameterValue("OCT3");
-    oct4 = STATES.getRawParameterValue("OCT4");
-
-    vol1 = STATES.getRawParameterValue("VOL1");
-    vol2 = STATES.getRawParameterValue("VOL2");
-    vol3 = STATES.getRawParameterValue("VOL3");
-    vol4 = STATES.getRawParameterValue("VOL4");
-
-    fine1 = STATES.getRawParameterValue("FINE1");
-    fine2 = STATES.getRawParameterValue("FINE2");
-    fine3 = STATES.getRawParameterValue("FINE3");
-    fine4 = STATES.getRawParameterValue("FINE4");
-
-    atta = STATES.getRawParameterValue("ATTA");
-    sust = STATES.getRawParameterValue("SUST");
-    deca = STATES.getRawParameterValue("DECA");
-    rele = STATES.getRawParameterValue("RELE");
-
-    Ftta = STATES.getRawParameterValue("FIAT");
-    Fust = STATES.getRawParameterValue("FISU");
-    Feca = STATES.getRawParameterValue("FIDE");
-    Fele = STATES.getRawParameterValue("FIRE");
-
-    dtun = STATES.getRawParameterValue("OS1D");
-    numV = STATES.getRawParameterValue("OS1N");
-
-    dtun3 = STATES.getRawParameterValue("OS3D");
-    numV3 = STATES.getRawParameterValue("OS3N");
-
-    dtun2 = STATES.getRawParameterValue("OS2D");
-    numV2 = STATES.getRawParameterValue("OS2N");
-
-    dtun4 = STATES.getRawParameterValue("OS4D");
-    numV4 = STATES.getRawParameterValue("OS4N");
-
-    OSC1WAVE = STATES.getRawParameterValue("WAVE1");
-    OSC2WAVE = STATES.getRawParameterValue("WAVE2");
-    OSC3WAVE = STATES.getRawParameterValue("WAVE3");
-    OSC4WAVE = STATES.getRawParameterValue("WAVE4");
-
-    OSC1VIV = STATES.getRawParameterValue("VIV1");
-    OSC2VIV = STATES.getRawParameterValue("VIV2");
-    OSC3VIV = STATES.getRawParameterValue("VIV3");
-    OSC4VIV = STATES.getRawParameterValue("VIV4");
-
-    OSCVIS = STATES.getRawParameterValue("VIS1");
-
-    FMM1 = STATES.getRawParameterValue("FM1");
-    FMM3 = STATES.getRawParameterValue("FM3");
-    FMM2 = STATES.getRawParameterValue("FM2");
-    FMM4 = STATES.getRawParameterValue("FM4");
-
-    DELAYF = STATES.getRawParameterValue("DELAF");
-    
-    DELAYV = STATES.getRawParameterValue("DELA");
-    DELAYFIL = STATES.getRawParameterValue("DELAFC");
-    DELAYFILT = STATES.getRawParameterValue("DELAFT");
-
-    DELAyL = STATES.getRawParameterValue("DELaL");
-    DELAyR = STATES.getRawParameterValue("DELaR");
-
-    REVEfc = STATES.getRawParameterValue("REVEFC");
-    REVEv = STATES.getRawParameterValue("REVEV");
-
-    REVEh = STATES.getRawParameterValue("REVEH");
-    REVEl = STATES.getRawParameterValue("REVEL");
-
-    std::fill(std::begin(filter),std::end(filter),0.0f);
-    std::fill(std::begin(filtera),std::end(filtera),0.0f);
-    std::fill(std::begin(filterb),std::end(filterb),0.0f);
-    std::fill(std::begin(filterc),std::end(filterc),0.0f);
-    std::fill(std::begin(filterd),std::end(filterd),0.0f);
-
-    std::fill(std::begin(delay),std::end(delay),0.0f);
-    std::fill(std::begin(delayR),std::end(delayR),0.0f);
-
-    std::fill(std::begin(combL),std::end(combL),0.0f);
-    std::fill(std::begin(combR),std::end(combR),0.0f);
-    std::fill(std::begin(combL2),std::end(combL2),0.0f);
-    std::fill(std::begin(combR2),std::end(combR2),0.0f);
-    std::fill(std::begin(combL3),std::end(combL3),0.0f);
-    std::fill(std::begin(combR3),std::end(combR3),0.0f);
-    std::fill(std::begin(combL4),std::end(combL4),0.0f);
-    std::fill(std::begin(combR4),std::end(combR4),0.0f);
-    std::fill(std::begin(combL5),std::end(combL5),0.0f);
-    std::fill(std::begin(combR5),std::end(combR5),0.0f);
-    std::fill(std::begin(combL6),std::end(combL6),0.0f);
-    std::fill(std::begin(combR6),std::end(combR6),0.0f);
-    std::fill(std::begin(combL7),std::end(combL7),0.0f);
-    std::fill(std::begin(combR7),std::end(combR7),0.0f);
-    std::fill(std::begin(combL8),std::end(combL8),0.0f);
-    std::fill(std::begin(combR8),std::end(combR8),0.0f);
-
-    std::fill(std::begin(allpasL),std::end(allpasL),0.0f);
-    std::fill(std::begin(allpasR),std::end(allpasR),0.0f);
-    std::fill(std::begin(allpasL2),std::end(allpasL2),0.0f);
-    std::fill(std::begin(allpasR2),std::end(allpasR2),0.0f);
-    std::fill(std::begin(allpasL3),std::end(allpasL3),0.0f);
-    std::fill(std::begin(allpasR3),std::end(allpasR3),0.0f);
-    std::fill(std::begin(allpasL4),std::end(allpasL4),0.0f);
-    std::fill(std::begin(allpasR4),std::end(allpasR4),0.0f);
-    std::fill(std::begin(allpasL5),std::end(allpasL5),0.0f);
-    std::fill(std::begin(allpasR5),std::end(allpasR5),0.0f);
-    std::fill(std::begin(allpasL6),std::end(allpasL6),0.0f);
-    std::fill(std::begin(allpasR6),std::end(allpasR6),0.0f);
-
-    delayindex =0;
-    combindx =0;
-    apfindx =0;
-
-    Synth.setCurrentPlaybackSampleRate(sampleRate);
-    Synth.clearSounds();
-    Synth.clearVoices();
-    for (int i = 0; i < 4; ++i){
-    
-        Synth.addVoice (new Wave(*this));
-    }
-        Synth.addSound (new synth());   
-
-}
-
-
-void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
-                                              juce::MidiBuffer& midiMessages)
-{
-    float cutoff = culcut->load();
-    float resona = culres->load();
-    float cutmod = culcmo->load();
-    float resomo = culrmo->load();
-    juce::ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels  = getTotalNumInputChannels();
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
-    auto sample = buffer.getNumSamples();
-
-    float delayFback = DELAYF->load();
-    
-    float delayVolum = DELAYV->load();
-
-    float reverbFback = 0.4f;
-    float reverbFbackComb = REVEfc->load();
-    float reverbVolum = REVEv->load();
-    float reverbVolumComb = 0.7f;
-
-    float reverbHcut = 1.0f-REVEh->load();
-    float reverbLcut = 1.0f-REVEl->load();
-
-    int delayLtime = static_cast<int>(DELAyL->load());
-    int delayRtime = static_cast<int>(DELAyR->load());
-
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i){
-        buffer.clear (i, 0, sample);
-    }
-
-    if (auto* playHead = getPlayHead()){
-        if (auto posi = playHead->getPosition()){
-            if (posi->getBpm().hasValue()){
-                BPM = static_cast<float>(*(posi->getBpm()));
-            }
-        }
-    }
-        float delayS = 60 / BPM;
-        int delaynumsample = static_cast<int>((delayS*0.25) * getSampleRate());
-
-        int delayRsamp = jmin((delaynumsample*delayRtime), 88199);
-        int delayLsamp = jmin((delaynumsample*delayLtime), 88199);
-     
-        float delayfilcut = 1.0f-DELAYFIL->load();
-        int dftype = static_cast<int>(DELAYFILT->load());
-    
-    Synth.renderNextBlock(buffer, midiMessages, 0, sample);
-    auto* chL = buffer.getWritePointer (0);
-    auto* chR = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) : chL;
-    
-    for (int i=0; i<sample; ++i){
-        float MENV = 0.0f;
-        for (int v=0; v<Synth.getNumVoices(); ++v){
-            if (auto Menv = dynamic_cast<Wave*>(Synth.getVoice(v))){
-                if (MENV < (Menv->modENV)){
-                    MENV = (Menv->modENV);
-                }
-            }
-        }
-        
-        float reso = resona + (resomo * MENV);
-        float cutoo = 1.0f-(cutoff+(MENV*cutmod));
-
-        if (reso > 1.0f)reso = 1.0f;
-        if (reso < 0.0f)reso = 0.0f;
-        if (cutoo > 1.0f)cutoo = 1.0f;
-        if (cutoo < 0.0f)cutoo = 0.0f;
-
-        float fL = (filtera[22]*-1.4f);
-        float fR = (filtera[23]*-1.4f);
-        float feedL = fL / (1.0f + std::fabs(fL));
-        float feedR = fR / (1.0f + std::fabs(fR));
-
-        float culinp = chL[i]+(feedL*reso);
-        float culinpR = chR[i]+(feedR*reso);
-
-        float out1 = (1.0f-cutoo)*culinp+(cutoo*filter[0]);
-        float out2 = (1.0f-cutoo)*culinpR+(cutoo*filter[1]);
-
-        filter[0]=out1;
-        filter[1]=out2;
-
-        float out3 = (1.0f-cutoo)*filter[0]+(cutoo*filter[2]);
-        float out4 = (1.0f-cutoo)*filter[1]+(cutoo*filter[3]);
-
-        filter[2]=out3;
-        filter[3]=out4;
-
-        float out5 = (1.0f-cutoo)*filter[2]+(cutoo*filter[4]);
-        float out6 = (1.0f-cutoo)*filter[3]+(cutoo*filter[5]);
-
-        filter[4]=out5;
-        filter[5]=out6;
-
-        float out7 = (1.0f-cutoo)*filter[4]+(cutoo*filter[6]);
-        float out8 = (1.0f-cutoo)*filter[5]+(cutoo*filter[7]);
-
-        filter[6]=out7;
-        filter[7]=out8;
-
-        float out9 = (1.0f-cutoo)*filter[6]+(cutoo*filter[8]);
-        float out10 = (1.0f-cutoo)*filter[7]+(cutoo*filter[9]);
-
-        filter[8]=out9;
-        filter[9]=out10;
-
-        float out11 = (1.0f-cutoo)*filter[8]+(cutoo*filter[10]);
-        float out12 = (1.0f-cutoo)*filter[9]+(cutoo*filter[11]);
-
-        filter[10]=out11;
-        filter[11]=out12;
-
-        float out13 = (1.0f-cutoo)*filter[10]+(cutoo*filter[12]);
-        float out14 = (1.0f-cutoo)*filter[11]+(cutoo*filter[13]);
-
-        filter[12]=out13;
-        filter[13]=out14;
-
-        float out15 = (1.0f-cutoo)*filter[12]+(cutoo*filter[14]);
-        float out16 = (1.0f-cutoo)*filter[13]+(cutoo*filter[15]);
-
-        filter[14]=out15;
-        filter[15]=out16;
-
-        float out17 = (1.0f-cutoo)*filter[14]+(cutoo*filter[16]);
-        float out18 = (1.0f-cutoo)*filter[15]+(cutoo*filter[17]);
-
-        filter[16]=out17;
-        filter[17]=out18;
-
-        float out19 = (1.0f-cutoo)*filter[16]+(cutoo*filter[18]);
-        float out20 = (1.0f-cutoo)*filter[17]+(cutoo*filter[19]);
-
-        filter[18]=out19;
-        filter[19]=out20;
-
-        float out21 = (1.0f-cutoo)*filter[18]+(cutoo*filter[20]);
-        float out22 = (1.0f-cutoo)*filter[19]+(cutoo*filter[21]);
-
-        filter[20]=out21;
-        filter[21]=out22;
-
-        float out23 = (1.0f-cutoo)*filter[20]+(cutoo*filter[22]);
-        float out24 = (1.0f-cutoo)*filter[21]+(cutoo*filter[23]);
-
-        filter[22]=out23;
-        filter[23]=out24;
-
-        filtera[0]=out23;
-        filtera[1]=out24;
-
-        float out3a = (1.0f-cutoo)*filtera[0]+(cutoo*filtera[2]);
-        float out4a = (1.0f-cutoo)*filtera[1]+(cutoo*filtera[3]);
-
-        filtera[2]=out3a;
-        filtera[3]=out4a;
-
-        float out5a = (1.0f-cutoo)*filtera[2]+(cutoo*filtera[4]);
-        float out6a = (1.0f-cutoo)*filtera[3]+(cutoo*filtera[5]);
-
-        filtera[4]=out5a;
-        filtera[5]=out6a;
-
-        float out7a = (1.0f-cutoo)*filtera[4]+(cutoo*filtera[6]);
-        float out8a = (1.0f-cutoo)*filtera[5]+(cutoo*filtera[7]);
-
-        filtera[6]=out7a;
-        filtera[7]=out8a;
-
-        float out9a = (1.0f-cutoo)*filtera[6]+(cutoo*filtera[8]);
-        float out10a = (1.0f-cutoo)*filtera[7]+(cutoo*filtera[9]);
-
-        filtera[8]=out9a;
-        filtera[9]=out10a;
-
-        float out11a = (1.0f-cutoo)*filtera[8]+(cutoo*filtera[10]);
-        float out12a = (1.0f-cutoo)*filtera[9]+(cutoo*filtera[11]);
-
-        filtera[10]=out11a;
-        filtera[11]=out12a;
-
-        float out13a = (1.0f-cutoo)*filtera[10]+(cutoo*filtera[12]);
-        float out14a = (1.0f-cutoo)*filtera[11]+(cutoo*filtera[13]);
-
-        filtera[12]=out13a;
-        filtera[13]=out14a;
-
-        float out15a = (1.0f-cutoo)*filtera[12]+(cutoo*filtera[14]);
-        float out16a = (1.0f-cutoo)*filtera[13]+(cutoo*filtera[15]);
-
-        filtera[14]=out15a;
-        filtera[15]=out16a;
-
-        float out17a = (1.0f-cutoo)*filtera[14]+(cutoo*filtera[16]);
-        float out18a = (1.0f-cutoo)*filtera[15]+(cutoo*filtera[17]);
-
-        filtera[16]=out17a;
-        filtera[17]=out18a;
-
-        float out19a = (1.0f-cutoo)*filtera[16]+(cutoo*filtera[18]);
-        float out20a = (1.0f-cutoo)*filtera[17]+(cutoo*filtera[19]);
-
-        filtera[18]=out19a;
-        filtera[19]=out20a;
-
-        float out21a = (1.0f-cutoo)*filtera[18]+(cutoo*filtera[20]);
-        float out22a = (1.0f-cutoo)*filtera[19]+(cutoo*filtera[21]);
-
-        filtera[20]=out21a;
-        filtera[21]=out22a;
-
-        float out23a = (1.0f-cutoo)*filtera[20]+(cutoo*filtera[22]);
-        float out24a = (1.0f-cutoo)*filtera[21]+(cutoo*filtera[23]);
-
-        filtera[22]=out23a;
-        filtera[23]=out24a;
-
-        chL[i]=out23a;
-        chR[i]=out24a;
-
-        int readIndex = (delayindex - delayLsamp+88200)%88200;
-            
-        int readIndexR = (delayindex - delayRsamp+88200)%88200;
-
-        float Lwet = delay[readIndex];
-        float Rwet = delayR[readIndexR];
-        
-        float Dout1 = (1.0f-delayfilcut)*Lwet+(delayfilcut*filterb[0]);
-        float Dout2 = (1.0f-delayfilcut)*Rwet+(delayfilcut*filterb[1]);
-        
-        filterb[0]=Dout1;
-        filterb[1]=Dout2;
-
-        float Dout3 = delayfilcut*(filterb[2]+Lwet-filterb[3]);
-        float Dout4 = delayfilcut*(filterb[4]+Rwet-filterb[5]);
-
-        filterb[2]=Dout3;
-        filterb[3]=Lwet;
-        filterb[4]=Dout4;
-        filterb[5]=Rwet;
-        
-        delay[delayindex] = chL[i] + (((Dout3*dftype)+(Dout1*(1-dftype))*0.6f) * delayFback);
-        delayR[delayindex] = chR[i] + (((Dout4*dftype)+(Dout2*(1-dftype))*0.6f) * delayFback);
-
-        chL[i] = chL[i] + (((Dout3*dftype)+(Dout1*(1-dftype)))*delayVolum);
-        chR[i] = chR[i] + (((Dout4*dftype)+(Dout2*(1-dftype)))*delayVolum);
-
-        LFO1 += 0.0000052154f;
-        if (LFO1>=1.0f)LFO1-=1.0f; 
-        LFO2 += 0.00000839f;
-        if (LFO2>=1.0f)LFO2-=1.0f;
-        LFO3 += 0.0000115646f;
-        if (LFO3>=1.0f)LFO3-=1.0f;
-        LFO4 += 0.0000156463f;
-        if (LFO4>=1.0f)LFO4-=1.0f;
-
-        int lfo1 = ReverbLFO[((int)LFO1*35)];
-        int lfo2 = ReverbLFO[((int)LFO2*35)];
-        int lfo3 = ReverbLFO[((int)LFO3*35)];
-        int lfo4 = ReverbLFO[((int)LFO4*35)];
-
-        int comb1 = (combindx - (1031+lfo1)+4096)%4096;
-
-        int comb2 = (combindx - (1123+lfo2)+4096)%4096;
-            
-        int comb3 = (combindx - (1217+lfo3)+4096)%4096;
-            
-        int comb4 = (combindx - (1321+lfo4)+4096)%4096;
-        
-        int comb5 = (combindx - (1429+lfo1)+4096)%4096;
-          
-        int comb6 = (combindx - (1531+lfo2)+4096)%4096;
-            
-        int comb7 = (combindx - (1621+lfo3)+4096)%4096;
-            
-        int comb8 = (combindx - (1721+lfo4)+4096)%4096;
-           
-        int comb1a = (combindx - (1789+lfo1)+4096)%4096;
-           
-        int comb2a = (combindx - (1901+lfo2)+4096)%4096;
-            
-        int comb3a = (combindx - (1999+lfo3)+4096)%4096;
-            
-        int comb4a = (combindx - (2113+lfo4)+4096)%4096;
-
-        int comb5a = (combindx - (2221+lfo1)+4096)%4096;
-           
-        int comb6a = (combindx - (2333+lfo2)+4096)%4096;
-          
-        int comb7a = (combindx - (2467+lfo3)+4096)%4096;
-            
-        int comb8a = (combindx - (2593+lfo4)+4096)%4096;
-           
-        
-        int alp1 = (apfindx - 233 + 1024)%1024;
-            
-        int alp2 = (apfindx - 293 + 1024)%1024;
-            
-        int alp3 = (apfindx - 383 + 1024)%1024;
-           
-        int alp4 = (apfindx - 419 + 1024)%1024;
-            
-        int alp5 = (apfindx - 547 + 1024)%1024;
-           
-        int alp6 = (apfindx - 701 + 1024)%1024;
-            
-
-        float ainp1 = chL[i];
-        float ainp2 = chR[i];
-        float siga1 = allpasL[alp1];
-        float siga2 = allpasR[alp1];
-        float aout1 = (ainp1 *-reverbFback)+siga1;
-        float aout2 = (ainp2 *-reverbFback)+siga2;
-        allpasL[apfindx]=ainp1+(siga1*reverbFback);
-        allpasR[apfindx]=ainp2+(siga2*reverbFback);
-
-        float siga3 = allpasL2[alp2];
-        float siga4 = allpasR2[alp2];
-        float aout3 = (aout1 *-reverbFback)+siga3;
-        float aout4 = (aout2 *-reverbFback)+siga4;
-        allpasL2[apfindx]=aout1+(siga3*reverbFback);
-        allpasR2[apfindx]=aout2+(siga4*reverbFback);
-
-        float siga5 = allpasL3[alp3];
-        float siga6 = allpasR3[alp3];
-        float aout5 = (aout3 *-reverbFback)+siga5;
-        float aout6 = (aout4 *-reverbFback)+siga6;
-        allpasL3[apfindx]=aout3+(siga5*reverbFback);
-        allpasR3[apfindx]=aout4+(siga6*reverbFback);
-
-        float siga7 = allpasL4[alp4];
-        float siga8 = allpasR4[alp4];
-        float aout7 = (aout5 *-reverbFback)+siga7;
-        float aout8 = (aout6 *-reverbFback)+siga8;
-        allpasL4[apfindx]=aout5+(siga7*reverbFback);
-        allpasR4[apfindx]=aout6+(siga8*reverbFback);
-
-        float siga9 = allpasL5[alp5];
-        float siga10 = allpasR5[alp5];
-        float aout9 = (aout7 *-reverbFback)+siga9;
-        float aout10 = (aout8 *-reverbFback)+siga10;
-        allpasL5[apfindx]=aout7+(siga9*reverbFback);
-        allpasR5[apfindx]=aout8+(siga10*reverbFback);
-
-        float siga11 = allpasL6[alp6];
-        float siga12 = allpasR6[alp6];
-        float aout11 = (aout9 *-reverbFback)+siga11;
-        float aout12 = (aout10 *-reverbFback)+siga12;
-        allpasL6[apfindx]=aout9+(siga11*reverbFback);
-        allpasR6[apfindx]=aout10+(siga12*reverbFback);
-        
-        float fd1 = combL[comb1];
-        float fd2 = combL2[comb3];
-        float fd3 = combL3[comb5];
-        float fd4 = combL4[comb7];
-        float fd5 = combL5[comb1a];
-        float fd6 = combL6[comb3a];
-        float fd7 = combL7[comb5a];
-        float fd8 = combL8[comb7a];
-        float fd9 = combR[comb2];
-        float fd10 = combR2[comb4];
-        float fd11 = combR3[comb6];
-        float fd12 = combR4[comb8];
-        float fd13 = combR5[comb2a];
-        float fd14 = combR6[comb4a];
-        float fd15 = combR7[comb6a];
-        float fd16 = combR8[comb8a];
-
-        float cout1 = (1.0f-reverbHcut)*fd1+(reverbHcut*filterc[0]);
-        float cout2 = (1.0f-reverbHcut)*fd9+(reverbHcut*filterc[1]);
-
-        filterc[0]=cout1;
-        filterc[1]=cout2;
-
-        float cout3 = (1.0f-reverbHcut)*fd2+(reverbHcut*filterc[2]);
-        float cout4 = (1.0f-reverbHcut)*fd10+(reverbHcut*filterc[3]);
-
-        filterc[2]=cout3;
-        filterc[3]=cout4;
-
-        float cout5 = (1.0f-reverbHcut)*fd3+(reverbHcut*filterc[4]);
-        float cout6 = (1.0f-reverbHcut)*fd11+(reverbHcut*filterc[5]);
-
-        filterc[4]=cout5;
-        filterc[5]=cout6;
-
-        float cout7 = (1.0f-reverbHcut)*fd4+(reverbHcut*filterc[6]);
-        float cout8 = (1.0f-reverbHcut)*fd12+(reverbHcut*filterc[7]);
-
-        filterc[6]=cout7;
-        filterc[7]=cout8;
-
-        float cout9 = (1.0f-reverbHcut)*fd5+(reverbHcut*filterc[8]);
-        float cout10 = (1.0f-reverbHcut)*fd13+(reverbHcut*filterc[9]);
-
-        filterc[8]=cout9;
-        filterc[9]=cout10;
-
-        float cout11 = (1.0f-reverbHcut)*fd6+(reverbHcut*filterc[10]);
-        float cout12 = (1.0f-reverbHcut)*fd14+(reverbHcut*filterc[11]);
-
-        filterc[10]=cout11;
-        filterc[11]=cout12;
-
-        float cout13 = (1.0f-reverbHcut)*fd7+(reverbHcut*filterc[12]);
-        float cout14 = (1.0f-reverbHcut)*fd15+(reverbHcut*filterc[13]);
-
-        filterc[12]=cout13;
-        filterc[13]=cout14;
-
-        float cout15 = (1.0f-reverbHcut)*fd8+(reverbHcut*filterc[14]);
-        float cout16 = (1.0f-reverbHcut)*fd16+(reverbHcut*filterc[15]);
-
-        filterc[14]=cout15;
-        filterc[15]=cout16;
-
-        
-        float fcout1 = reverbLcut*(filterd[0]+cout1-filterd[1]);
-        float fcout2 = reverbLcut*(filterd[2]+cout2-filterd[3]);
-
-        filterd[0]=fcout1;
-        filterd[1]=cout1;
-        filterd[2]=fcout2;
-        filterd[3]=cout2;
-
-        float fcout3 = reverbLcut*(filterd[4]+cout3-filterd[5]);
-        float fcout4 = reverbLcut*(filterd[6]+cout4-filterd[7]);
-
-        filterd[4]=fcout3;
-        filterd[5]=cout3;
-        filterd[6]=fcout4;
-        filterd[7]=cout4;
-
-        float fcout5 = reverbLcut*(filterd[8]+cout5-filterd[9]);
-        float fcout6 = reverbLcut*(filterd[10]+cout6-filterd[11]);
-
-        filterd[8]=fcout5;
-        filterd[9]=cout5;
-        filterd[10]=fcout6;
-        filterd[11]=cout6;
-
-        float fcout7 = reverbLcut*(filterd[12]+cout7-filterd[13]);
-        float fcout8 = reverbLcut*(filterd[14]+cout8-filterd[15]);
-
-        filterd[12]=fcout7;
-        filterd[13]=cout7;
-        filterd[14]=fcout8;
-        filterd[15]=cout8;
-
-        float fcout9 = reverbLcut*(filterd[16]+cout9-filterd[17]);
-        float fcout10 = reverbLcut*(filterd[18]+cout10-filterd[19]);
-
-        filterd[16]=fcout9;
-        filterd[17]=cout9;
-        filterd[18]=fcout10;
-        filterd[19]=cout10;
-
-        float fcout11 = reverbLcut*(filterd[20]+cout11-filterd[21]);
-        float fcout12 = reverbLcut*(filterd[22]+cout12-filterd[23]);
-
-        filterd[20]=fcout11;
-        filterd[21]=cout11;
-        filterd[22]=fcout12;
-        filterd[23]=cout12;
-
-        float fcout13 = reverbLcut*(filterd[24]+cout13-filterd[25]);
-        float fcout14 = reverbLcut*(filterd[26]+cout14-filterd[27]);
-
-        filterd[24]=fcout13;
-        filterd[25]=cout13;
-        filterd[26]=fcout14;
-        filterd[27]=cout14;
-
-        float fcout15 = reverbLcut*(filterd[28]+cout15-filterd[29]);
-        float fcout16 = reverbLcut*(filterd[30]+cout16-filterd[31]);
-
-        filterd[28]=fcout15;
-        filterd[29]=cout15;
-        filterd[30]=fcout16;
-        filterd[31]=cout16;
-
-        float ham[16];
-        ham[0]=fcout1; ham[1]=fcout2; ham[2]=fcout3; ham[3]=fcout4; ham[4]=fcout5; ham[5]=fcout6; ham[6]=fcout7; ham[7]=fcout8;
-        ham[8]=fcout9; ham[9]=fcout10; ham[10]=fcout11; ham[11]=fcout12; ham[12]=fcout13; ham[13]=fcout14; ham[14]=fcout15; ham[15]=fcout16;
-        Hadamard16(ham);
-        
-        combL[combindx] = (aout11*(1.0f-(reverbFbackComb*0.4f))) + ham[0]*reverbFbackComb;
-        combR[combindx] = (aout12*(1.0f-(reverbFbackComb*0.4f))) + ham[1]*reverbFbackComb;
-        combL2[combindx] = (aout11*(1.0f-(reverbFbackComb*0.4f))) + ham[2]*reverbFbackComb;
-        combR2[combindx] = (aout12*(1.0f-(reverbFbackComb*0.4f))) + ham[3]*reverbFbackComb;
-        combL3[combindx] = (aout11*(1.0f-(reverbFbackComb*0.4f))) + ham[4]*reverbFbackComb;
-        combR3[combindx] = (aout12*(1.0f-(reverbFbackComb*0.4f))) + ham[5]*reverbFbackComb;
-        combL4[combindx] = (aout11*(1.0f-(reverbFbackComb*0.4f))) + ham[6]*reverbFbackComb;
-        combR4[combindx] = (aout12*(1.0f-(reverbFbackComb*0.4f))) + ham[7]*reverbFbackComb;
-        combL5[combindx] = (aout11*(1.0f-(reverbFbackComb*0.4f))) + ham[8]*reverbFbackComb;
-        combR5[combindx] = (aout12*(1.0f-(reverbFbackComb*0.4f))) + ham[9]*reverbFbackComb;
-        combL6[combindx] = (aout11*(1.0f-(reverbFbackComb*0.4f))) + ham[10]*reverbFbackComb;
-        combR6[combindx] = (aout12*(1.0f-(reverbFbackComb*0.4f))) + ham[11]*reverbFbackComb;
-        combL7[combindx] = (aout11*(1.0f-(reverbFbackComb*0.4f))) + ham[12]*reverbFbackComb;
-        combR7[combindx] = (aout12*(1.0f-(reverbFbackComb*0.4f))) + ham[13]*reverbFbackComb;
-        combL8[combindx] = (aout11*(1.0f-(reverbFbackComb*0.4f))) + ham[14]*reverbFbackComb;
-        combR8[combindx] = (aout12*(1.0f-(reverbFbackComb*0.4f))) + ham[15]*reverbFbackComb;
-
-        float LoutFDN = (ham[0]+ham[2]+ham[4]+ham[6]+ham[8]+ham[11]+ham[13]+ham[15])*0.25f;
-        float RoutFDN = (ham[1]+ham[3]+ham[5]+ham[7]+ham[9]+ham[10]+ham[12]+ham[14])*0.25f;
-
-        chL[i] = (chL[i]*(1.0f-reverbVolum))+ ((LoutFDN*0.9f)*reverbVolum);
-        chR[i] = (chR[i]*(1.0f-reverbVolum)) +((RoutFDN*0.9f)*reverbVolum);
-
-        delayindex = (delayindex + 1) % 88200;
-    
-        combindx = (combindx + 1) % 4096;
-        
-        apfindx = (apfindx + 1) % 1024;
-    }
-    midiMessages.clear();
-}
-
 inline void AudioPluginAudioProcessor::Hadamard16 (float* Hamadard)
 {
-    for (int i = 0; i < 16; i += 2) {
+    for (int_fast8_t i = 0; i < 16; i += 2) {
         float a = Hamadard[i], b = Hamadard[i+1];
         Hamadard[i] = a + b; Hamadard[i+1] = a - b;
     }
-    for (int i = 0; i < 16; i += 4) {
-        for (int j = 0; j < 2; ++j) {
+    for (int_fast8_t i = 0; i < 16; i += 4) {
+        for (int_fast8_t j = 0; j < 2; ++j) {
             float a = Hamadard[i+j], b = Hamadard[i+j+2];
             Hamadard[i+j] = a + b; Hamadard[i+j+2] = a - b;
         }
     }
-    for (int i = 0; i < 16; i += 8) {
-        for (int j = 0; j < 4; ++j) {
+    for (int_fast8_t i = 0; i < 16; i += 8) {
+        for (int_fast8_t j = 0; j < 4; ++j) {
             float a = Hamadard[i+j], b = Hamadard[i+j+4];
             Hamadard[i+j] = a + b; Hamadard[i+j+4] = a - b;
         }
     }
-    for (int j = 0; j < 8; ++j) {
+    for (int_fast8_t j = 0; j < 8; ++j) {
         float a = Hamadard[j], b = Hamadard[j+8];
         Hamadard[j] = a + b; Hamadard[j+8] = a - b;
     }
-    const float Nor = 1.0f / 4.0f; 
-    for (int i = 0; i < 16; ++i) {
-        Hamadard[i] *= Nor;
+    for (int_fast8_t i = 0; i < 16; ++i) {
+        Hamadard[i] *= 0.25f;
     }
 }
+
+inline void AudioPluginAudioProcessor::Hadamard8 (float* Hamadard)
+{
+    for (int_fast8_t i = 0; i < 8; i += 2) {
+        float a = Hamadard[i], b = Hamadard[i+1];
+        Hamadard[i] = a + b; Hamadard[i+1] = a - b;
+    }
+    for (int_fast8_t i = 0; i < 8; i += 4) {
+        for (int_fast8_t j = 0; j < 2; ++j) {
+            float a = Hamadard[i+j], b = Hamadard[i+j+2];
+            Hamadard[i+j] = a + b; Hamadard[i+j+2] = a - b;
+        }
+    }
+    for (int_fast8_t i = 0; i < 4; ++i) {
+        float a = Hamadard[i], b = Hamadard[i+4];
+        Hamadard[i] = a + b; Hamadard[i+4] = a - b;
+    }
+    
+    for (int_fast8_t i = 0; i < 8; ++i) {
+        Hamadard[i] *= 0.25f;
+    }
+}
+inline void AudioPluginAudioProcessor::voice (int num)
+ {
+    synth.clearVoices();
+    synth.clearSounds();
+    
+    for (uint_fast8_t i=0; i<num; ++i){
+        synth.addVoice(new Wave(*this));
+    }
+    synth.addSound(new Synth());
+ }
+
+ inline float AudioPluginAudioProcessor::APF (float in, float d, float* buf2, float* buf, int x, int r)
+ {
+    buf2[x] = (in*-d)+buf[r]+(buf2[r]*d);
+    buf[x]=in;
+    return buf2[x];
+ }
+
+ inline float AudioPluginAudioProcessor::oneIIR (float in, float& b, float r)
+ {
+    b = (in * (1.0f-r))+b*r;
+    return b;
+ }
+
+ inline float AudioPluginAudioProcessor::oneHPF (float in, float* b, float R)
+ {
+    float r = 1.0f-R;
+    float out = r*(b[0]+in-b[1]);
+    b[0]=out;
+    b[1]=in;
+    return out;
+ }
+ inline float AudioPluginAudioProcessor::chorus (float ix, float in, float d, float* b, int x, int p)
+ {
+    b[x]=in;
+    float t = (ix*p)+((1.0f-ix)*(1.0f-p));
+    uint_fast16_t n = (uint_fast16_t)(t*d);
+    float out = b[(uint_fast16_t)(x-n)&1023];
+    return out;
+ }
+
+ inline float AudioPluginAudioProcessor::wshapeing (float in, float m, float g, float t)
+ {
+    float x = std::max(0.1f, (1.0f - (std::fabsf(in * (1.0f+(g*2.0f))))));
+        x*=x;
+    float y = (in * x)*(1.5f+g);
+    float z = (in * (x*x*x*x))*(5.0f+g);
+    float o = (y*(1.0f-t))+z*t;
+    return (in*(1.0f-m))+o*m;
+ }
+ inline uint32_t AudioPluginAudioProcessor::getrandom ()
+ {
+    xorradom ^= xorradom << 15;
+    xorradom ^= xorradom >> 13;
+    xorradom ^= xorradom << 7;
+    return xorradom;
+ }
