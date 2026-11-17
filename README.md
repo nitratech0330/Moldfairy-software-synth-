@@ -10,8 +10,8 @@ Synth for Trance music
 - A Synth that has 4 of Oscillator, Saw, 
   Supersaw Wave, Sine Wave, Square Wave, 
   FM, Filter, 2 Envelope(for volume and filter), 
-  Reberb, and Delay...
-- I using JUCE freamwork
+  Reverb, Delay, Satulation, Compressor, and Chorus...
+- I'm using JUCE freamwork
 # Note
 
 - I am a beginner, I started learning C++ just a few weeks ago.
