@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mrfd>
+  <NITRA>
+    <PARAM id="detun1" value="0.199999988079071"/>
+    <PARAM id="detun2" value="0.199999988079071"/>
+    <PARAM id="detun3" value="0.199999988079071"/>
+    <PARAM id="detun4" value="0.0"/>
+    <PARAM id="fine1" value="0.0"/>
+    <PARAM id="fine2" value="0.0"/>
+    <PARAM id="fine3" value="0.0"/>
+    <PARAM id="fine4" value="0.0"/>
+    <PARAM id="oct1" value="0.0"/>
+    <PARAM id="oct2" value="0.0"/>
+    <PARAM id="oct3" value="0.0"/>
+    <PARAM id="oct4" value="0.0"/>
+    <PARAM id="voice1" value="0.0"/>
+    <PARAM id="voice2" value="0.0"/>
+    <PARAM id="voice3" value="0.0"/>
+    <PARAM id="voice4" value="0.0"/>
+    <PARAM id="vol1" value="0.5"/>
+    <PARAM id="vol2" value="0.0"/>
+    <PARAM id="vol3" value="0.0"/>
+    <PARAM id="vol4" value="0.0"/>
+    <PARAM id="wave1" value="0.0"/>
+    <PARAM id="wave2" value="0.0"/>
+    <PARAM id="wave3" value="0.0"/>
+    <PARAM id="wave4" value="0.0"/>
+    <PARAM id="DeF" value="0.5"/>
+    <PARAM id="DeL" value="3.0"/>
+    <PARAM id="DeR" value="6.0"/>
+    <PARAM id="DeV" value="0.01999999955296516"/>
+    <PARAM id="Fc" value="1.0"/>
+    <PARAM id="FcM" value="0.0"/>
+    <PARAM id="Fr" value="0.0"/>
+    <PARAM id="FrM" value="0.0"/>
+    <PARAM id="ReD" value="0.8499999642372131"/>
+    <PARAM id="ReF" value="0.9300000071525574"/>
+    <PARAM id="ReHc" value="0.3100000023841858"/>
+    <PARAM id="ReLc" value="0.4099999964237213"/>
+    <PARAM id="ReV" value="0.0"/>
+    <PARAM id="att" value="0.0"/>
+    <PARAM id="biv" value="0.04999999701976776"/>
+    <PARAM id="biv1"/>
+    <PARAM id="biv2" value="0.0"/>
+    <PARAM id="biv3"/>
+    <PARAM id="biv4"/>
+    <PARAM id="dec" value="0.4799999892711639"/>
+    <PARAM id="fm1" value="0.0"/>
+    <PARAM id="fm2"/>
+    <PARAM id="fm3"/>
+    <PARAM id="fm4"/>
+    <PARAM id="matt" value="0.0"/>
+    <PARAM id="mdec" value="0.3599999845027924"/>
+    <PARAM id="mrel" value="0.6899999976158142"/>
+    <PARAM id="msus" value="0.0"/>
+    <PARAM id="rel" value="0.2999999821186066"/>
+    <PARAM id="ster1" value="1.0"/>
+    <PARAM id="ster2"/>
+    <PARAM id="ster3"/>
+    <PARAM id="ster4"/>
+    <PARAM id="sus" value="0.2299999892711639"/>
+    <PARAM id="chd" value="0.2199999988079071"/>
+    <PARAM id="cho" value="0.0"/>
+    <PARAM id="chs" value="0.2299999892711639"/>
+    <PARAM id="chw" value="1.0"/>
+    <PARAM id="lfcm" value="0.0"/>
+    <PARAM id="lfgt" value="0.0"/>
+    <PARAM id="slo" value="3.0"/>
+    <PARAM id="ulo" value="0.2199999988079071"/>
+    <PARAM id="uslf" value="0.0"/>
+    <PARAM id="wsg" value="0.0"/>
+    <PARAM id="wsm" value="0.0"/>
+    <PARAM id="wst" value="0.0"/>
+    <PARAM id="comp" value="0.0"/>
+    <PARAM id="test" value="0.009999999776482582"/>
+    <PARAM id="compA" value="0.5899999737739563"/>
+    <PARAM id="compD" value="0.4799999892711639"/>
+    <PARAM id="compR" value="1.0"/>
+    <PARAM id="compU" value="0.8899999856948853"/>
+    <PARAM id="note1"/>
+    <PARAM id="note2"/>
+    <PARAM id="note3"/>
+    <PARAM id="note4"/>
+    <PARAM id="sldp" value="0.5099999904632568"/>
+    <PARAM id="slod" value="0.0"/>
+    <PARAM id="uldp" value="0.08999999612569809"/>
+    <PARAM id="ulod" value="0.0"/>
+  </NITRA>
+</mrfd>
