@@ -1061,7 +1061,7 @@ void AudioPluginAudioProcessor::getStateInformation (juce::MemoryBlock& destData
     auto State = STATE.copyState();
     std::unique_ptr<juce::XmlElement>apvtsXml (State.createXml());
     xml.addChildElement (apvtsXml.release());
-    copyXmlToBinary (xml, destData);
+    copyXmlToBinary (xml, destData);  
 }
 
 void AudioPluginAudioProcessor::setStateInformation (const void* data, int sizeInBytes)

@@ -19,6 +19,9 @@ public:
     void timerCallback() override;
     void showmenu();
     void showmenu2();
+    void showPresetmenu();
+    void showPresetSavemenu();
+    void setdef();
 
     uint_fast8_t menunum=0;
     uint_fast8_t menunum2=0;
@@ -31,8 +34,13 @@ public:
         "img8.png","img9.png","img10.png","img11.png",
         "img12.png","img13.png","img14.png","img15.png"
     }};
+
+    juce::File def;
     juce::TextButton B;
     juce::TextButton B2;
+    juce::TextButton B3;
+
+    std::unique_ptr<juce::FileChooser> Choose;
     
     std::array<std::array<juce::Slider, 9>,4>oscsliders;
     std::array<juce::Slider, 48>sliders2;

@@ -110,6 +110,11 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     B2.onClick = [this](){showmenu2();};
     B2.setAlpha(0.0f);
 
+    addAndMakeVisible(B3);
+    B3.setColour(juce::TextButton::buttonColourId, juce::Colours::transparentWhite);
+    B3.onClick = [this](){showPresetmenu();};
+    B3.setButtonText("Serect Preset...");
+
     sliders2[25].onValueChange = [this](){auto Db = sliders2[26].getBounds(); repaint(Db.getX()+50, Db.getY()+6, 60, 15);};
     sliders2[26].onValueChange = [this](){auto Db = sliders2[26].getBounds(); repaint(Db.getX()+50, Db.getY()+20, 60, 15);};
 
@@ -270,6 +275,8 @@ void AudioPluginAudioProcessorEditor::resized()
 
     B2.setBounds(325, 340, 60, 20);
 
+    B3.setBounds(353, 12, 100, 15);
+
     sliders2[32].setBounds(395, 285, 40, 40);
     sliders2[33].setBounds(395, 330, 40, 40);
 
@@ -327,5 +334,143 @@ void AudioPluginAudioProcessorEditor::showmenu2()
         repaint(b.getX(), b.getY(), b.getWidth(), b.getHeight());
     });
 }
+void AudioPluginAudioProcessorEditor::showPresetmenu()
+{
+    
+    juce::PopupMenu menu;
+    menu.addItem(1, "Save Preset");
+    menu.addItem(2, "Load Preset");
+    menu.addItem(3, "Default Preset");
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&B3),[this](int d){
+        if (d == 0) return;
+        switch (d)
+        {
+            case 1:{
+                showPresetSavemenu();
+                break;
+            }
+            case 2:{
+                auto folder = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("Nitratech");
+                if (!folder.exists()){
+                    auto Pfolder = folder.getChildFile("MoldFairy");
+                    Choose = std::make_unique<juce::FileChooser>(
+                        "Load Preset",
+                        Pfolder,
+                        "*.xml"
+                    );
 
+                    auto Flags = juce::FileBrowserComponent::openMode
+                      | juce::FileBrowserComponent::canSelectFiles;
+
+                      Choose->launchAsync(Flags, [this](const juce::FileChooser& FC)
+                      {
+                        auto FL = FC.getResult();
+                        if (FL.existsAsFile()){
+                             std::unique_ptr<juce::XmlElement> xml(juce::XmlDocument::parse(FL));
+                             if (xml !=nullptr){
+                                if (xml->hasTagName("mrfd")){
+                                    auto apS = xml->getChildByName(processorRef.STATE.state.getType().toString());
+                                    if (apS != nullptr){
+                                        processorRef.STATE.replaceState(juce::ValueTree::fromXml(*apS));
+                                        processorRef.updateHostDisplay();
+                                        B3.setButtonText(FL.getFileNameWithoutExtension());
+                                    }
+                                }
+                             }
+                        }
+                      });
+
+                }else{
+                    Choose = std::make_unique<juce::FileChooser>(
+                        "Load Preset",
+                        juce::File::getSpecialLocation(juce::File::userDocumentsDirectory),
+                        "*.xml"
+                    );
+
+                    auto Flags = juce::FileBrowserComponent::openMode
+                      | juce::FileBrowserComponent::canSelectFiles;
+
+                        Choose->launchAsync(Flags, [this](const juce::FileChooser& FC)
+                      {
+                        auto FL = FC.getResult();
+                        if (FL.existsAsFile()){
+                             std::unique_ptr<juce::XmlElement> xml(juce::XmlDocument::parse(FL));
+                             if (xml !=nullptr){
+                                if (xml->hasTagName("mrfd")){
+                                    auto apS = xml->getChildByName(processorRef.STATE.state.getType().toString());
+                                    if (apS != nullptr){
+                                        processorRef.STATE.replaceState(juce::ValueTree::fromXml(*apS));
+                                        processorRef.updateHostDisplay();
+                                        processorRef.changeProgramName(1, FL.getFileName());
+                                        B3.setButtonText(FL.getFileNameWithoutExtension());
+                                    }
+                                }
+                             }
+                        }
+                      });
+                }
+                break;
+            }
+            case 3:{
+                setdef();
+                break;
+            }
+        }
+    });
+}
+
+void AudioPluginAudioProcessorEditor::showPresetSavemenu()
+{
+    auto* W = new juce::AlertWindow("Save Preset", "Name:", juce::MessageBoxIconType::NoIcon);
+    W->addTextEditor("Pname", "New Preset", "Name:");
+    W->addButton("Save", 1, juce::KeyPress(juce::KeyPress::returnKey));
+    W->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
+    W->enterModalState(true, juce::ModalCallbackFunction::create([this, W](int R)
+    {
+        if(R==1){
+            auto N = W->getTextEditorContents("Pname").trim();
+            if (N.isNotEmpty()){
+                auto FName = juce::File::createLegalFileName(N) + ".xml";
+                auto file = juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDocumentsDirectory).getChildFile("Nitratech");
+                if (!file.exists())file.createDirectory();
+
+                auto Pfile = file.getChildFile("MoldFairy");
+
+                if (!Pfile.exists())Pfile.createDirectory();
+
+                auto PsetXML =  Pfile.getChildFile(FName);
+                
+                if (auto XML = processorRef.STATE.copyState().createXml())
+                {
+                    juce::XmlElement xml ("mrfd");
+                    xml.addChildElement(XML.release());
+                    xml.writeTo(PsetXML);
+                    B3.setButtonText(PsetXML.getFileNameWithoutExtension());
+                }
+            }
+        }
+    }),true);
+}
+
+void AudioPluginAudioProcessorEditor::setdef()
+{
+    juce::File file = juce::File::getSpecialLocation(juce::File::SpecialLocationType::currentApplicationFile);
+                def = file.getChildFile("Contents")
+                    .getChildFile("Resources")
+                    .getChildFile("images")
+                    .getChildFile("Default.xml");
+                if (def.existsAsFile()){
+                    std::unique_ptr<juce::XmlElement> xml(juce::XmlDocument::parse(def));
+                    if (xml !=nullptr){
+                        if (xml->hasTagName("mrfd")){
+                            auto apS = xml->getChildByName(processorRef.STATE.state.getType().toString());
+                            if (apS != nullptr){
+                                processorRef.STATE.replaceState(juce::ValueTree::fromXml(*apS));
+                                processorRef.updateHostDisplay();
+                                B3.setButtonText("Default");
+                            }   
+                        }
+                    }
+                }
+}
 
