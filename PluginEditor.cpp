@@ -54,8 +54,8 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
             {"ReV", &sliders2[27]},
             {"ReF", &sliders2[28]},
             {"ReD", &sliders2[29]},
-            {"ReLc", &sliders2[30]},
-            {"ReHc", &sliders2[31]},
+            {"ReHc", &sliders2[30]},
+            {"ReLc", &sliders2[31]},
 
             {"sldp", &sliders2[32]},
             {"uldp", &sliders2[33]},
